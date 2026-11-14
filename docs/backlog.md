@@ -24,8 +24,6 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 ## Now
 
-- [~] **BL-23** `P0 · Urgent` **Allowlist: color only Logic's own windows (1.3.6):** while drawing, the theme acts only in windows it can confirm belong to Logic itself (not plug-in windows, not windows or views from plug-in code, not unknown windows). Everything else stays stock. Suggested by Codex. Adi asked 2026-11-14.
-
 
 - [~] **BL-18** `P1 · High` **Null test:** prove the audio is identical with and without BrightMeUp by comparing two bounces sample by sample. Adi asked 2026-11-14. tools/null-test.sh written and self-tested; needs two bounces of the same project (stock and BrightMeUp).
 
@@ -33,6 +31,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 ## Done
+
+- [x] **BL-23** `P0 · Urgent` **Allowlist: color only Logic's own windows (1.3.6):** while drawing, the theme acts only in windows it can confirm belong to Logic itself (not plug-in windows, not windows or views from plug-in code, not unknown windows). Everything else stays stock. Suggested by Codex. Adi asked 2026-11-14. Main window render identical to 1.3.5; plug-in windows not yet machine-tested (test project had no plug-ins). Published as v1.3.6. · done 2026-11-14
 
 - [x] **BL-22** `P0 · Urgent` **ChromaVerb graph turned light:** the graph area inside ChromaVerb (and other plug-ins with graphs: EnVerb, Channel EQ, Tremolo, Ensemble, ADSR) was lightened, because MAVectorUIKit, which draws those graphs, was missing from the plug-in list. Add it so plug-ins stay stock. Real cause (found after 1.3.3): the theme also mapped 2276 colors from the plug-in color catalog (MAPlugInGUISwift), e.g. WhiteReverbPluginDisplayBackground. 1.3.4 never maps plug-in catalog colors. Adi reported 2026-11-14. 1.3.5 adds a window-based draw guard and a stack check for shared Logic code (Adaptive Limiter meters, found with Codex); verified with a real capture of Adaptive Limiter. · done 2026-11-14
 
