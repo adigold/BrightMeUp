@@ -64,6 +64,12 @@ static volatile int pluginRangeCount = 0;
 static const char *const PLUGIN_PATHS[] = { "/MAPlugInGUI.framework/", "/MAPlugInGUISwift.framework/", "/MAAlchemy.framework/",
    "/MAGenerativeInstrumentsUI.framework/", "/MADSP.framework/", "/MADSPCore.framework/",
    "/MADSPPlugInPublic.framework/", "/MAResourcesPlugInsShared.framework/", "/MAVectorUIKit.framework/", "/Audio/Plug-Ins/", ".component/", ".vst3/", ".vst/", ".appex/" };
+// Shared Logic code that builds colors for both Logic and plug-ins, for example the asset colors
+// of a plug-in nib. A color request from here is checked against the whole stack (Adi, 2026-11-14:
+// Adaptive Limiter meters).
+static ImageRange sharedRanges[MAX_RANGES];
+static volatile int sharedRangeCount = 0;
+static const char *const SHARED_PATHS[] = { "/MACore.framework/", "/MAToolKit.framework/", "/MAToolKitHighLevel.framework/", "/MAGUI.framework/" };
 static double grayGamma = GAMMA_DEFAULT;
 static double surfaceMax = SURFACE_MAX_DEFAULT;
 
@@ -96,7 +102,7 @@ static void addImage(const struct mach_header *header, intptr_t slide) {
    Dl_info info;
    const struct load_command *cmd = (const void *)((const struct mach_header_64 *)header + 1);
 
-   BOOL isLogic, isPlugin = NO;
+   BOOL isLogic, isPlugin = NO, isShared = NO;
 
    if (!dladdr(header, &info) || !info.dli_fname) {
       return;
@@ -106,6 +112,10 @@ static void addImage(const struct mach_header *header, intptr_t slide) {
       isPlugin = isPlugin || strstr(info.dli_fname, PLUGIN_PATHS[i]) != NULL;
    }
    isPlugin = isPlugin && pluginRangeCount < MAX_RANGES;
+   for (size_t i = 0; i < sizeof(SHARED_PATHS) / sizeof(SHARED_PATHS[0]); i++) {
+      isShared = isShared || strstr(info.dli_fname, SHARED_PATHS[i]) != NULL;
+   }
+   isShared = isShared && sharedRangeCount < MAX_RANGES;
    if (!isLogic && !isPlugin) {
       return;
    }
@@ -120,6 +130,11 @@ static void addImage(const struct mach_header *header, intptr_t slide) {
             logicRanges[logicRangeCount] = range;
             atomic_thread_fence(memory_order_release);
             logicRangeCount += 1;
+         }
+         if (isShared) {
+            sharedRanges[sharedRangeCount] = range;
+            atomic_thread_fence(memory_order_release);
+            sharedRangeCount += 1;
          }
          if (isPlugin) {
             pluginRanges[pluginRangeCount] = range;
@@ -148,12 +163,26 @@ static BOOL isPluginCaller(void *address) {
 
 // Walks the stack (addresses only, no symbol lookup). Used only where calls are rare.
 static BOOL isPluginOnStack(void) {
-   void *frames[32];
-   int depth = backtrace(frames, 32);
+   void *frames[96];
+   int depth = backtrace(frames, 96);
 
    for (int i = 0; i < depth; i++) {
       if (isPluginCaller(frames[i])) {
          return YES;
+      }
+   }
+   return NO;
+}
+
+// True when shared Logic code asks for a color on behalf of a plug-in.
+static BOOL isSharedForPlugin(void *address) {
+   uintptr_t pc = (uintptr_t)address & ADDRESS_MASK;
+   int count = sharedRangeCount;
+
+   atomic_thread_fence(memory_order_acquire);
+   for (int i = 0; i < count; i++) {
+      if (pc >= sharedRanges[i].start && pc < sharedRanges[i].end) {
+         return isPluginOnStack();
       }
    }
    return NO;
@@ -463,10 +492,18 @@ static BOOL shouldSkip(void) {
    return isRealtimeThread() || isPluginDrawing();
 }
 
+// Set while the main thread draws a view of a plug-in window. This catches views that draw with
+// a light appearance of their own, so the window decides, not the appearance (Adi, 2026-11-14:
+// Adaptive Limiter meters).
+static __thread int pluginDrawDepth = 0;
+
 static BOOL isPluginDrawing(void) {
    NSAppearance *current;
    BOOL result;
 
+   if (pluginDrawDepth > 0) {
+      return YES;
+   }
    if (!atomic_load_explicit(&hasPluginWindow, memory_order_acquire) || isCheckingPlugin) {
       return NO;
    }
@@ -495,7 +532,7 @@ static CGColorRef hookCGColor(id named, SEL sel) {
 
    // A plug-in can reach a catalog color through AppKit, so after the first plug-in window the
    // whole stack is checked too (Adi, 2026-11-14: ChromaVerb graph).
-   if (shouldSkip() || isPluginCaller(__builtin_return_address(0)) || (atomic_load_explicit(&hasPluginWindow, memory_order_acquire) && isPluginOnStack())) {
+   if (shouldSkip() || isPluginCaller(__builtin_return_address(0)) || isSharedForPlugin(__builtin_return_address(0)) || (atomic_load_explicit(&hasPluginWindow, memory_order_acquire) && isPluginOnStack())) {
       return realCGColor(named);
    }
    tag = objc_getAssociatedObject(named, &mappedKey);
@@ -541,13 +578,13 @@ static void hookAppSetAppearance(id app, SEL sel, NSAppearance *appearance) {
 
 #define WHITE_HOOK(fn, orig) \
    static NSColor *fn(id cls, SEL sel, CGFloat white, CGFloat alpha) { \
-      CGFloat mapped = isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !shouldSkip() ? mapGray(white, alpha) : white; \
+      CGFloat mapped = isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !shouldSkip() && !isSharedForPlugin(__builtin_return_address(0)) ? mapGray(white, alpha) : white; \
       return ((NSColor *(*)(id, SEL, CGFloat, CGFloat))orig)(cls, sel, mapped, alpha); \
    }
 
 #define RGB_HOOK(fn, orig) \
    static NSColor *fn(id cls, SEL sel, CGFloat r, CGFloat g, CGFloat b, CGFloat a) { \
-      if (shouldSkip() || isPluginCaller(__builtin_return_address(0))) { \
+      if (shouldSkip() || isPluginCaller(__builtin_return_address(0)) || isSharedForPlugin(__builtin_return_address(0))) { \
       } else if (isLogicCaller(__builtin_return_address(0)) && isGrayish(r, g, b)) { \
          r = g = b = mapGray((r + g + b) / 3, a); \
       } else if (isLogicCaller(__builtin_return_address(0)) && isDarkenedLiteral(r, g, b)) { \
@@ -560,7 +597,7 @@ static void hookAppSetAppearance(id app, SEL sel, NSAppearance *appearance) {
 
 #define NAMED_HOOK(fn, orig, white) \
    static NSColor *fn(id cls, SEL sel) { \
-      if (isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !shouldSkip()) { \
+      if (isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !shouldSkip() && !isSharedForPlugin(__builtin_return_address(0))) { \
          return ((NSColor *(*)(id, SEL, CGFloat, CGFloat))origGenWhite)(cls, @selector(colorWithGenericGamma22White:alpha:), mapGray(white, 1), 1); \
       } \
       return ((NSColor *(*)(id, SEL))orig)(cls, sel); \
@@ -1369,6 +1406,37 @@ static void hookViewMoved(NSView *view, SEL sel) {
    }
 }
 
+static IMP origDrawRectClip, origDrawLayer, origDrawBackingLayer;
+
+// True when this draw call belongs to a plug-in window. Only the main thread draws views here.
+static BOOL isDrawingPluginView(NSView *view) {
+   return pthread_main_np() && atomic_load_explicit(&hasPluginWindow, memory_order_acquire) && isPluginWindow(view.window);
+}
+
+static void hookDrawRectClip(NSView *view, SEL sel, NSRect rect, BOOL clip) {
+   BOOL isPlugin = isDrawingPluginView(view);
+
+   pluginDrawDepth += isPlugin;
+   ((void (*)(id, SEL, NSRect, BOOL))origDrawRectClip)(view, sel, rect, clip);
+   pluginDrawDepth -= isPlugin;
+}
+
+static void hookDrawLayer(NSView *view, SEL sel, CALayer *layer, CGContextRef ctx) {
+   BOOL isPlugin = isDrawingPluginView(view);
+
+   pluginDrawDepth += isPlugin;
+   ((void (*)(id, SEL, CALayer *, CGContextRef))origDrawLayer)(view, sel, layer, ctx);
+   pluginDrawDepth -= isPlugin;
+}
+
+static void hookDrawBackingLayer(NSView *view, SEL sel, CALayer *layer, CGContextRef ctx, id handler) {
+   BOOL isPlugin = isDrawingPluginView(view);
+
+   pluginDrawDepth += isPlugin;
+   ((void (*)(id, SEL, CALayer *, CGContextRef, id))origDrawBackingLayer)(view, sel, layer, ctx, handler);
+   pluginDrawDepth -= isPlugin;
+}
+
 static void hookViewSetAppearance(NSView *view, SEL sel, NSAppearance *appearance) {
    if (appearance == mappedAqua && !isRealtimeThread() && view.window && isPluginWindow(view.window)) {
       appearance = trueDarkAqua;
@@ -1769,6 +1837,14 @@ __attribute__((constructor)) static void start(void) {
    origButtonImage = method_setImplementation(class_getInstanceMethod([NSButtonCell class], @selector(drawImage:withFrame:inView:)), (IMP)hookButtonImage);
    origViewMoved = method_setImplementation(class_getInstanceMethod([NSView class], @selector(viewDidMoveToWindow)), (IMP)hookViewMoved);
    origViewSetAppearance = method_setImplementation(class_getInstanceMethod([NSView class], @selector(setAppearance:)), (IMP)hookViewSetAppearance);
+   // Optional: if a macOS update renames these, the appearance check above still protects plug-ins.
+   if (class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawRect:clip:"))) {
+      origDrawRectClip = method_setImplementation(class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawRect:clip:")), (IMP)hookDrawRectClip);
+   }
+   origDrawLayer = method_setImplementation(class_getInstanceMethod([NSView class], @selector(drawLayer:inContext:)), (IMP)hookDrawLayer);
+   if (class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawViewBackingLayer:inContext:drawingHandler:"))) {
+      origDrawBackingLayer = method_setImplementation(class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawViewBackingLayer:inContext:drawingHandler:")), (IMP)hookDrawBackingLayer);
+   }
    // Always installed: it keeps every plug-in window in the stock dark look.
    origOrderWindow = method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), (IMP)hookOrderWindow);
    if (surfaceMax < 1) {
