@@ -57,7 +57,6 @@ let AREAS = [
       symbol: "info.circle"),
    AreaInfo(key: "browsers", name: "Browsers and library", summary: "Library, Loop and File browsers, new track sheet",
       symbol: "folder"),
-   AreaInfo(key: "plugins", name: "Plug-in windows", summary: "Stock instruments and effects", symbol: "waveform"),
    AreaInfo(key: "windows", name: "Windows and panels", summary: "Shared backgrounds, dividers, buttons, text",
       symbol: "macwindow"),
 ]
@@ -103,12 +102,12 @@ let PRESETS = [
    Preset(name: "Gentle", group: "Low contrast", summary: "Soft edges", surfaceMax: 0.92, gamma: 0.45),
    Preset(name: "Haze", group: "Low contrast", summary: "Flat, quiet", surfaceMax: 0.8, gamma: 0.4),
    Preset(name: "Fog", group: "Low contrast", summary: "Flat, dim", surfaceMax: 0.7, gamma: 0.35),
-   Preset(name: "Dark Plug-ins", group: "By area", summary: "Light, plug-ins stay dark", surfaceMax: SURFACE_MAX_DEFAULT,
-      gamma: GAMMA_DEFAULT, areas: [ "plugins": ORIGINAL ]),
-   Preset(name: "Producer", group: "By area", summary: "Bright editors, dark plug-ins", surfaceMax: 0.9, gamma: 0.8,
-      areas: [ "editors": custom(1, 0.6), "plugins": ORIGINAL ]),
-   Preset(name: "Mix Engineer", group: "By area", summary: "Calm mixer, dark plug-ins", surfaceMax: 0.85, gamma: 0.85,
-      areas: [ "mixer": custom(0.78, 1.05), "plugins": ORIGINAL ]),
+   Preset(name: "Dark Control Bar", group: "By area", summary: "Light, control bar stays dark", surfaceMax: SURFACE_MAX_DEFAULT,
+      gamma: GAMMA_DEFAULT, areas: [ "controlbar": ORIGINAL ]),
+   Preset(name: "Producer", group: "By area", summary: "Bright editors, soft rest", surfaceMax: 0.9, gamma: 0.8,
+      areas: [ "editors": custom(1, 0.6) ]),
+   Preset(name: "Mix Engineer", group: "By area", summary: "Calm mixer", surfaceMax: 0.85, gamma: 0.85,
+      areas: [ "mixer": custom(0.78, 1.05) ]),
    Preset(name: "Focus Tracks", group: "By area", summary: "Bright tracks, dim the rest", surfaceMax: 0.66, gamma: 1.1,
       areas: [ "tracks": custom(1, 0.75) ]),
    Preset(name: "Bright Editors", group: "By area", summary: "Soft, editors brighter", surfaceMax: 0.85, gamma: 0.85,
@@ -119,8 +118,8 @@ let PRESETS = [
       gamma: GAMMA_DEFAULT, areas: [ "inspector": custom(0.82, 1), "browsers": custom(0.82, 1) ]),
    Preset(name: "Bold Control Bar", group: "By area", summary: "Contrast in the control bar", surfaceMax: 0.9,
       gamma: 0.8, areas: [ "controlbar": custom(0.96, 1.6) ]),
-   Preset(name: "Night Session", group: "By area", summary: "Dim, tracks lifted, dark plug-ins", surfaceMax: 0.56,
-      gamma: 1.35, areas: [ "tracks": custom(0.7, 1.1), "plugins": ORIGINAL ]),
+   Preset(name: "Night Session", group: "By area", summary: "Dim, tracks lifted", surfaceMax: 0.56,
+      gamma: 1.35, areas: [ "tracks": custom(0.7, 1.1) ]),
    Preset(name: "Score Writer", group: "By area", summary: "Paper-white editors", surfaceMax: 0.8, gamma: 1,
       areas: [ "editors": custom(1, 0.45) ]),
 ]
@@ -548,7 +547,8 @@ struct ContentView: View {
    func themeFor(_ key: String) -> ThemeValues {
       let value = areas[key]
 
-      if showsStock || value.mode == Int(AREA_MODE_ORIGINAL) {
+      // Plug-ins always keep their own look; BrightMeUp changes only the Logic Pro interface.
+      if showsStock || key == "plugins" || value.mode == Int(AREA_MODE_ORIGINAL) {
          return ThemeValues(surfaceMax: 1, gamma: 1, isStock: true)
       }
       if value.mode == Int(AREA_MODE_CUSTOM) {
@@ -558,6 +558,9 @@ struct ContentView: View {
    }
 
    var previewCaption: String {
+      if previewKind == "plugin" {
+         return "Plug-ins always keep their own look. BrightMeUp changes only the Logic Pro interface."
+      }
       let kind = PREVIEW_KINDS.first { (k) in return k.key == previewKind } ?? PREVIEW_KINDS[1]
       let modes = kind.areas.map { (key) -> String in
          let name = AREAS.first { (a) in return a.key == key }?.name ?? key

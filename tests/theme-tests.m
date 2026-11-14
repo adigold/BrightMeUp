@@ -74,6 +74,10 @@ static void testAreas(void) {
    check(mapped && isClose(CGColorGetComponents(mapped)[0], 0.8), "an area that follows uses the overall values");
    CGColorRelease(mapped);
    areaSettings[AREA_MIXER] = (AreaSetting){ AREA_MODE_OVERALL, 1, 1 };
+   readAreaSettings();
+   check(areaSettings[AREA_PLUGINS].mode == AREA_MODE_ORIGINAL, "plug-in colors always keep the original look");
+   check(copyMappedColor(color, @"ChannelEQPluginBypassGlyphOn") == NULL, "a plug-in color never changes");
+   check(!isPluginWindow(nil), "no window is not a plug-in window");
    CGColorRelease(color);
 }
 

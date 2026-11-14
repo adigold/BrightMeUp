@@ -27,8 +27,9 @@
 Logic Pro only comes in dark. That is great at night, but in a bright room or on a long day the dark screen can be hard on your eyes. BrightMeUp gives Logic Pro a light look, as bright or as soft as you like.
 
 - **30 presets** in six groups: Bright, Balanced, Dim, High contrast, Low contrast and By area.
-- **Every part your way.** Set the Tracks area, Mixer, Editors, Control bar, Inspector, Browsers, Plug-in windows and shared panels on their own, or keep any of them in the original dark look.
-- **Live preview.** See the Main window, Tracks, Mixer, Piano Roll or a plug-in change while you move the sliders, and compare Before and After.
+- **Every part your way.** Set the Tracks area, Mixer, Editors, Control bar, Inspector, Browsers and shared panels on their own, or keep any of them in the original dark look.
+- **Plug-ins stay untouched.** BrightMeUp changes only the Logic Pro interface. Every plug-in window, built in or third party, keeps its own look.
+- **Live preview.** See the Main window, Tracks, Mixer or Piano Roll change while you move the sliders, and compare Before and After.
 - **Your own presets.** Save your favorite settings and switch in one click.
 - **Back to stock in one click.** Revert to Logic Defaults restarts Logic Pro in its original look. Your settings stay saved for next time.
 - **Nothing to undo.** BrightMeUp never changes Logic Pro or your projects. Open Logic Pro from the Dock and it looks exactly like it always did.

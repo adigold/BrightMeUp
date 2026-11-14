@@ -18,7 +18,10 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
+
+- [~] **BL-13** `P1 · Critical` **Never touch plug-ins:** the theme also changed plug-in windows (built-in and third-party). Only the Logic Pro interface may change; every plug-in window must keep its own look. Adi reported 2026-11-14. Fixed in 1.2.4: plug-in windows keep the real dark look and every color/image hook skips them; plug-in area removed from the app. GitHub release v1.2.3 set to draft so the buggy build cannot be downloaded. Waiting for Adi to confirm in Logic Pro before publishing.
 
 ## Done
 

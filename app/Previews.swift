@@ -18,12 +18,12 @@ let PREVIEW_KINDS = [
    PreviewKind(key: "tracks", name: "Tracks", areas: [ "tracks" ]),
    PreviewKind(key: "mixer", name: "Mixer", areas: [ "mixer" ]),
    PreviewKind(key: "pianoroll", name: "Piano Roll", areas: [ "editors" ]),
-   PreviewKind(key: "plugin", name: "Plug-in", areas: [ "plugins" ]),
+   PreviewKind(key: "plugin", name: "Plug-ins", areas: []),
 ]
 
 // The preview that shows each area best, so editing an area can bring its preview forward.
 let PREVIEW_FOR_AREA = [ "tracks": "tracks", "mixer": "mixer", "editors": "pianoroll", "controlbar": "main",
-   "inspector": "main", "plugins": "plugin", "browsers": "main", "windows": "main" ]
+   "inspector": "main", "browsers": "main", "windows": "main" ]
 
 extension ThemeValues {
    // Translucent black recesses (meters, fader tracks) become a light shade, like the theme's well rule.

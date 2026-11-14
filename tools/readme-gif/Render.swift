@@ -202,7 +202,7 @@ struct FrameView: View {
    }
 
    var areaNames: [String] {
-      return [ "Mixer", "Piano Roll", "Plug-ins" ]
+      return [ "Mixer", "Piano Roll", "Main window" ]
    }
 
    var liveTheme: ThemeValues {
@@ -217,7 +217,7 @@ struct FrameView: View {
       let step = SHOT.width + 60
 
       return VStack(spacing: 20) {
-         Text("Every part of Logic Pro, your way")
+         Text("Every part of the Logic Pro interface, your way")
             .font(.system(size: 34, weight: .heavy, design: .rounded))
             .foregroundStyle(ink)
          ZStack {
@@ -225,7 +225,8 @@ struct FrameView: View {
                .offset(x: (0 - position) * step)
             MockPianoRoll(theme: liveTheme).frame(width: SHOT.width, height: 340)
                .offset(x: (1 - position) * step)
-            MockPlugin(theme: liveTheme).frame(width: SHOT.width, height: 340)
+            MockMainWindow(controlBar: liveTheme, inspector: liveTheme, tracks: liveTheme)
+               .frame(width: SHOT.width, height: 340)
                .offset(x: (2 - position) * step)
          }
          .frame(width: CANVAS.width, height: 340)
@@ -251,7 +252,7 @@ struct FrameView: View {
          Text("BrightMeUp")
             .font(.system(size: 52, weight: .heavy, design: .rounded))
             .foregroundStyle(.white)
-         Text("30 presets  ·  8 areas  ·  back to stock in one click")
+         Text("30 presets  ·  7 areas  ·  plug-ins untouched")
             .font(.system(size: 21, weight: .medium, design: .rounded))
             .foregroundStyle(.white.opacity(0.8))
          HStack(spacing: 6) {

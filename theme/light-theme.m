@@ -62,6 +62,8 @@ static NSString *const AREA_KEYS[AREA_COUNT] = { @"tracks", @"mixer", @"editors"
 typedef struct { int mode; double surfaceMax; double gamma; } AreaSetting;
 static AreaSetting areaSettings[AREA_COUNT];
 static NSAppearance *trueAqua;
+// The real dark appearance, which plug-in windows keep. Nothing else in Logic Pro uses it.
+static NSAppearance *trueDarkAqua;
 static CGColorSpaceRef srgbSpace;
 static NSString *outDir;
 static int recoloredImages = 0;
@@ -317,6 +319,52 @@ static CGColorRef copyMappedColorWith(CGColorRef color, NSString *name, double s
    return mapped;
 }
 
+// The windows that show plug-ins, built in or third party. They keep the stock look (Adi, 2026-11-14:
+// the theme changes the Logic Pro interface only, never a plug-in).
+static NSString *const PLUGIN_WINDOW_CLASSES[] = { @"MAPluginWindow", @"CLgPluginWindow", @"LgHUDPluginWindow", @"MetaPluginWindow" };
+static NSString *const PLUGIN_CONTROLLER_CLASSES[] = { @"LgPluginWindowController", @"MAPluginWindowChildWindowController", @"GzAudioUnitUIWindowController" };
+
+/**
+ * Reports if a window shows a plug-in, or belongs to one, such as a menu or a child window.
+ *
+ * @param window NSWindow * - the window
+ * @return BOOL - true for a plug-in window
+ */
+static BOOL isPluginWindow(NSWindow *window) {
+   for (NSWindow *w = window; w; w = w.parentWindow) {
+      for (size_t i = 0; i < sizeof(PLUGIN_WINDOW_CLASSES) / sizeof(PLUGIN_WINDOW_CLASSES[0]); i++) {
+         Class cls = NSClassFromString(PLUGIN_WINDOW_CLASSES[i]);
+
+         if (cls && [w isKindOfClass:cls]) {
+            return YES;
+         }
+      }
+      for (size_t i = 0; i < sizeof(PLUGIN_CONTROLLER_CLASSES) / sizeof(PLUGIN_CONTROLLER_CLASSES[0]); i++) {
+         Class cls = NSClassFromString(PLUGIN_CONTROLLER_CLASSES[i]);
+
+         if (cls && [w.windowController isKindOfClass:cls]) {
+            return YES;
+         }
+      }
+   }
+   return NO;
+}
+
+/**
+ * Reports if AppKit is drawing inside a plug-in window. Plug-in windows keep the real dark
+ * appearance, and every other window of Logic Pro is light, so the drawing appearance tells.
+ *
+ * @return BOOL - true while a plug-in window draws
+ */
+static BOOL isPluginDrawing(void) {
+   if (@available(macOS 11.0, *)) {
+      NSAppearance *current = NSAppearance.currentDrawingAppearance;
+
+      return current == trueDarkAqua || [current.name isEqualToString:NSAppearanceNameDarkAqua];
+   }
+   return NO;
+}
+
 static CGColorRef realCGColor(id named) {
    return ((CGColorRef (*)(id, SEL))origCGColor)(named, @selector(cgColor));
 }
@@ -330,8 +378,13 @@ static CGColorRef realCGColor(id named) {
  * @return CGColorRef - the color to draw with
  */
 static CGColorRef hookCGColor(id named, SEL sel) {
-   id tag = objc_getAssociatedObject(named, &mappedKey);
+   id tag;
    CGColorRef mapped;
+
+   if (isPluginDrawing()) {
+      return realCGColor(named);
+   }
+   tag = objc_getAssociatedObject(named, &mappedKey);
 
    if (!tag) {
       tag = [NSNull null];
@@ -354,7 +407,9 @@ static CGColorRef hookCGColor(id named, SEL sel) {
 static NSAppearance *hookAppearanceNamed(id cls, SEL sel, NSAppearanceName name) {
    NSAppearanceName mapped = name;
 
-   if ([name isEqualToString:NSAppearanceNameDarkAqua]) {
+   if (isPluginDrawing()) {
+      mapped = name;
+   } else if ([name isEqualToString:NSAppearanceNameDarkAqua]) {
       mapped = NSAppearanceNameAqua;
    } else if ([name isEqualToString:NSAppearanceNameVibrantDark]) {
       mapped = NSAppearanceNameVibrantLight;
@@ -368,13 +423,14 @@ static void hookAppSetAppearance(id app, SEL sel, NSAppearance *appearance) {
 
 #define WHITE_HOOK(fn, orig) \
    static NSColor *fn(id cls, SEL sel, CGFloat white, CGFloat alpha) { \
-      CGFloat mapped = isLogicCaller(__builtin_return_address(0)) ? mapGray(white, alpha) : white; \
+      CGFloat mapped = isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing() ? mapGray(white, alpha) : white; \
       return ((NSColor *(*)(id, SEL, CGFloat, CGFloat))orig)(cls, sel, mapped, alpha); \
    }
 
 #define RGB_HOOK(fn, orig) \
    static NSColor *fn(id cls, SEL sel, CGFloat r, CGFloat g, CGFloat b, CGFloat a) { \
-      if (isLogicCaller(__builtin_return_address(0)) && isGrayish(r, g, b)) { \
+      if (isPluginDrawing()) { \
+      } else if (isLogicCaller(__builtin_return_address(0)) && isGrayish(r, g, b)) { \
          r = g = b = mapGray((r + g + b) / 3, a); \
       } else if (isLogicCaller(__builtin_return_address(0)) && isDarkenedLiteral(r, g, b)) { \
          r *= ACCENT_DARKEN; \
@@ -386,7 +442,7 @@ static void hookAppSetAppearance(id app, SEL sel, NSAppearance *appearance) {
 
 #define NAMED_HOOK(fn, orig, white) \
    static NSColor *fn(id cls, SEL sel) { \
-      if (isLogicCaller(__builtin_return_address(0))) { \
+      if (isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing()) { \
          return ((NSColor *(*)(id, SEL, CGFloat, CGFloat))origGenWhite)(cls, @selector(colorWithGenericGamma22White:alpha:), mapGray(white, 1), 1); \
       } \
       return ((NSColor *(*)(id, SEL))orig)(cls, sel); \
@@ -406,11 +462,19 @@ NAMED_HOOK(hookDarkGray, origDarkGray, 1.0 / 3)
 NAMED_HOOK(hookLightGray, origLightGray, 2.0 / 3)
 NAMED_HOOK(hookGray, origGray, 0.5)
 
+static IMP origSecondaryLabel, origTertiaryLabel;
+
 static NSColor *hookSecondaryLabel(id cls, SEL sel) {
+   if (isPluginDrawing()) {
+      return ((NSColor *(*)(id, SEL))origSecondaryLabel)(cls, sel);
+   }
    return [NSColor colorWithSRGBRed:0 green:0 blue:0 alpha:SECONDARY_LABEL_ALPHA];
 }
 
 static NSColor *hookTertiaryLabel(id cls, SEL sel) {
+   if (isPluginDrawing()) {
+      return ((NSColor *(*)(id, SEL))origTertiaryLabel)(cls, sel);
+   }
    return [NSColor colorWithSRGBRed:0 green:0 blue:0 alpha:TERTIARY_LABEL_ALPHA];
 }
 
@@ -769,6 +833,9 @@ static BOOL hookRepDraw(NSImageRep *rep, SEL sel, NSRect rect, NSRect from, NSCo
    NSImageRep *shown = rep;
    BOOL isSmall = rep.size.width <= DRAW_IMAGE_MAX && rep.size.height <= DRAW_IMAGE_MAX;
 
+   if (isPluginDrawing()) {
+      return ((RepDraw)origRepDraw)(rep, sel, rect, from, op, fraction, flipped, hints);
+   }
    if (isLogicCaller(__builtin_return_address(0)) && isSmall) {
       id tag = objc_getAssociatedObject(rep, &mappedKey);
 
@@ -786,7 +853,7 @@ static BOOL hookRepDraw(NSImageRep *rep, SEL sel, NSRect rect, NSRect from, NSCo
 }
 
 static void hookImageDraw(NSImage *image, SEL sel, NSRect rect, NSRect from, NSCompositingOperation op, CGFloat fraction, BOOL flipped, NSDictionary *hints) {
-   NSImage *shown = isLogicCaller(__builtin_return_address(0)) ? drawableImage(image) : image;
+   NSImage *shown = isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing() ? drawableImage(image) : image;
 
    ((ImageDraw)origImageDraw)(shown, sel, rect, from, op, fraction, flipped, hints);
 }
@@ -801,13 +868,13 @@ static void hookImageDraw(NSImage *image, SEL sel, NSRect rect, NSRect from, NSC
  */
 static NSImageRep *hookBestRep(NSImage *image, SEL sel, NSRect rect, NSGraphicsContext *context, NSDictionary *hints) {
    uintptr_t caller = (uintptr_t)__builtin_return_address(0) & ADDRESS_MASK;
-   NSImage *shown = caller >= threePartDraw.start && caller < threePartDraw.end ? drawableImage(image) : image;
+   NSImage *shown = caller >= threePartDraw.start && caller < threePartDraw.end && !isPluginDrawing() ? drawableImage(image) : image;
 
    return ((NSImageRep *(*)(id, SEL, NSRect, id, id))origBestRep)(shown, sel, rect, context, hints);
 }
 
 static void interposeThreePart(NSRect frame, NSImage *start, NSImage *center, NSImage *end, BOOL vertical, NSCompositingOperation op, CGFloat fraction, BOOL flipped) {
-   if (isLogicCaller(__builtin_return_address(0))) {
+   if (isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing()) {
       start = drawableImage(start);
       center = drawableImage(center);
       end = drawableImage(end);
@@ -829,7 +896,7 @@ static void interposeDrawPath(CGContextRef ctx, CGPathDrawingMode mode) {
    CGColorRef fill = NULL;
    size_t count = 0;
 
-   if (isLogicCaller(__builtin_return_address(0))) {
+   if (isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing()) {
       caller = (uintptr_t)__builtin_return_address(2) & ADDRESS_MASK;
    }
    if (caller >= regionDrawStart && caller < regionDrawEnd && fillColorOf) {
@@ -859,7 +926,7 @@ static void interposeDrawPath(CGContextRef ctx, CGPathDrawingMode mode) {
  * @param color CGColorRef - the fill color
  */
 static void interposeFillColor(CGContextRef ctx, CGColorRef color) {
-   const CGFloat *c = isOnBevel && color ? CGColorGetComponents(color) : NULL;
+   const CGFloat *c = isOnBevel && color && !isPluginDrawing() ? CGColorGetComponents(color) : NULL;
    size_t count = c ? CGColorGetNumberOfComponents(color) : 0;
 
    if (count >= 2 && fmax(c[0], c[count > 2 ? count - 2 : 0]) < BLACK_MAX) {
@@ -887,7 +954,7 @@ static void interposeLineDraw(CTLineRef line, CGContextRef ctx) {
    CGColorRef text = NULL, rgb = NULL;
    const CGFloat *c = NULL;
 
-   if (caller >= textDraw.start && caller < textDraw.end && isCalledFrom(rulerMarkerDraw, (ImageRange){ 0, 0 })) {
+   if (caller >= textDraw.start && caller < textDraw.end && !isPluginDrawing() && isCalledFrom(rulerMarkerDraw, (ImageRange){ 0, 0 })) {
       runs = CTLineGetGlyphRuns(line);
    }
    if (runs && CFArrayGetCount(runs) > 0) {
@@ -929,10 +996,16 @@ __attribute__((used, section("__DATA,__interpose"))) static struct { const void 
 };
 
 static id hookCompositeImage(id manager, SEL sel, id description, id context) {
+   if (isPluginDrawing()) {
+      return ((id (*)(id, SEL, id, id))origCompositeImage)(manager, sel, description, context);
+   }
    return recoloredAsset(((id (*)(id, SEL, id, id))origCompositeImage)(manager, sel, description, context), assetStyle(description));
 }
 
 static id hookCatalogImage(id manager, SEL sel, id description, id context) {
+   if (isPluginDrawing()) {
+      return ((id (*)(id, SEL, id, id))origCatalogImage)(manager, sel, description, context);
+   }
    return recoloredAsset(((id (*)(id, SEL, id, id))origCatalogImage)(manager, sel, description, context), assetStyle(description));
 }
 
@@ -1035,10 +1108,20 @@ static id hookNibDecode(NSCoder *decoder, SEL sel, NSString *key) {
    id decoded = ((id (*)(id, SEL, NSString *))origNibDecode)(decoder, sel, key);
    BOOL isCellColor = [key isEqualToString:@"NSTextColor"] || [key isEqualToString:@"NSBackgroundColor"];
 
+   NSColor *mapped;
+
    if (!isCellColor || ![decoded isKindOfClass:[NSColor class]]) {
       return decoded;
    }
-   return mappedGrayColor(decoded, 1);
+   mapped = mappedGrayColor(decoded, 1);
+   if (mapped == decoded) {
+      return decoded;
+   }
+   // A nib does not know its window yet, so the color decides when it draws: a plug-in window
+   // gets the color from the nib, every other window gets the mapped color.
+   return [NSColor colorWithName:nil dynamicProvider:^NSColor *(NSAppearance *appearance) {
+      return isPluginDrawing() ? (NSColor *)decoded : mapped;
+   }];
 }
 
 /**
@@ -1050,7 +1133,7 @@ static id hookNibDecode(NSCoder *decoder, SEL sel, NSString *key) {
  * @param color NSColor * - the new background color
  */
 static void hookFieldBackground(NSTextField *field, SEL sel, NSColor *color) {
-   NSColor *mapped = isLogicCaller(__builtin_return_address(0)) ? mappedGrayColor(color, FIELD_DARK_MAX) : color;
+   NSColor *mapped = isLogicCaller(__builtin_return_address(0)) && !isPluginWindow(field.window) && !isPluginDrawing() ? mappedGrayColor(color, FIELD_DARK_MAX) : color;
 
    ((void (*)(id, SEL, NSColor *))origFieldBackground)(field, sel, mapped);
 }
@@ -1071,7 +1154,7 @@ static id __attribute__((ns_returns_retained)) hookAppearanceDecode(__attribute_
 
 // AppKit blends the header with plus darker under VibrantLight, which paints a black bar.
 static void hookHeaderDraw(NSView *view, SEL sel, NSRect rect) {
-   if (view.appearance != trueAqua) {
+   if (view.appearance != trueAqua && !isPluginWindow(view.window)) {
       view.appearance = trueAqua;
    }
    ((void (*)(id, SEL, NSRect))origHeaderDraw)(view, sel, rect);
@@ -1107,14 +1190,14 @@ static BOOL isColored(NSColor *color) {
 // Glyphs are tinted with label colors, which are black here. Active colored buttons keep their
 // fill, so their glyphs must stay white. Neutral fills stay light, and need a dark glyph.
 static void hookToolbarImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect frame, NSView *view) {
-   BOOL isActive = cell.state == NSControlStateValueOn && isColored(object_getIvar(cell, toolbarOnColor));
+   BOOL isActive = !isPluginDrawing() && cell.state == NSControlStateValueOn && isColored(object_getIvar(cell, toolbarOnColor));
 
    ((void (*)(id, SEL, NSImage *, NSRect, NSView *))origToolbarImage)(cell, sel, isActive ? whiteGlyph(image) : image, frame, view);
 }
 
 // Inactive windows draw these buttons without the colored fill.
 static void hookButtonImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect frame, NSButton *view) {
-   BOOL isButton = [view isKindOfClass:[NSButton class]] && view.window.isMainWindow;
+   BOOL isButton = [view isKindOfClass:[NSButton class]] && view.window.isMainWindow && !isPluginWindow(view.window);
    BOOL isActive = isButton && cell.state == NSControlStateValueOn && isColored(view.bezelColor);
 
    ((void (*)(id, SEL, NSImage *, NSRect, NSView *))origButtonImage)(cell, sel, isActive ? whiteGlyph(image) : image, frame, view);
@@ -1124,7 +1207,12 @@ static void hookButtonImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect 
 // window background. The main window uses the mapped BackgroundViewControlbar color, but the
 // editor windows use the system windowBackgroundColor, which the theme does not map.
 static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode place, NSInteger other) {
-   if (place != NSWindowOut && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
+   // A plug-in window keeps the real dark appearance, so it and the plug-in inside look stock.
+   if (place != NSWindowOut && isPluginWindow(window)) {
+      if (window.appearance != trueDarkAqua) {
+         window.appearance = trueDarkAqua;
+      }
+   } else if (place != NSWindowOut && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
       window.titlebarAppearsTransparent = YES;
       if ([window.backgroundColor isEqual:NSColor.windowBackgroundColor]) {
          window.backgroundColor = [NSColor colorNamed:@"BackgroundViewControlbar"];
@@ -1138,6 +1226,9 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
 static NSColor *hookClipBackground(NSClipView *view, SEL sel) {
    NSColor *color = ((NSColor *(*)(id, SEL))origClipBackground)(view, sel);
 
+   if (isPluginDrawing() || isPluginWindow(view.window)) {
+      return color;
+   }
    return [color isEqual:NSColor.controlBackgroundColor] ? scaledControlBackground : color;
 }
 
@@ -1148,6 +1239,10 @@ static NSColor *hookClipBackground(NSClipView *view, SEL sel) {
 static void hookPlatterLayout(NSView *platter, SEL sel) {
    NSView *glass = platter.superview.superview;
 
+   if (isPluginWindow(platter.window)) {
+      ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
+      return;
+   }
    if ([glass isKindOfClass:objc_getClass("NSGlassContainerView")] && glass.alphaValue != PLATTER_ALPHA) {
       glass.alphaValue = PLATTER_ALPHA;
    }
@@ -1221,6 +1316,9 @@ static void readAreaSettings(void) {
          areaSettings[i].mode = AREA_MODE_OVERALL;
       }
       areaSettings[i].surfaceMax = fmin(1, fmax(SURFACE_MAX_MIN, [lightest respondsToSelector:@selector(doubleValue)] ? [lightest doubleValue] : surfaceMax));
+      if (i == AREA_PLUGINS) {
+         areaSettings[i].mode = AREA_MODE_ORIGINAL;
+      }
       areaSettings[i].gamma = fmin(GAMMA_MAX, fmax(GAMMA_MIN, [gamma respondsToSelector:@selector(doubleValue)] ? [gamma doubleValue] : grayGamma));
    }
 }
@@ -1338,6 +1436,7 @@ __attribute__((constructor)) static void start(void) {
    srgbSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
    singleAppearanceNames = listSingleAppearanceNames();
    trueAqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+   trueDarkAqua = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
    _dyld_register_func_for_add_image(addImage);
    // These symbols bound the three arrange view region functions, which are adjacent in Logic.
    regionDrawStart = (uintptr_t)dlsym(RTLD_DEFAULT, "_ZNK9CRegionUI31drawRegionInArrangeViewWithFlexEv");
@@ -1366,8 +1465,8 @@ __attribute__((constructor)) static void start(void) {
    origDarkGray = swapClassMethod(color, @selector(darkGrayColor), (IMP)hookDarkGray);
    origLightGray = swapClassMethod(color, @selector(lightGrayColor), (IMP)hookLightGray);
    origGray = swapClassMethod(color, @selector(grayColor), (IMP)hookGray);
-   swapClassMethod(color, @selector(secondaryLabelColor), (IMP)hookSecondaryLabel);
-   swapClassMethod(color, @selector(tertiaryLabelColor), (IMP)hookTertiaryLabel);
+   origSecondaryLabel = swapClassMethod(color, @selector(secondaryLabelColor), (IMP)hookSecondaryLabel);
+   origTertiaryLabel = swapClassMethod(color, @selector(tertiaryLabelColor), (IMP)hookTertiaryLabel);
    manager = objc_getClass("MAAssetManager");
    origCompositeImage = method_setImplementation(class_getInstanceMethod(manager, NSSelectorFromString(@"CompositeImageFromDescription:withContext:")), (IMP)hookCompositeImage);
    origCatalogImage = method_setImplementation(class_getInstanceMethod(manager, NSSelectorFromString(@"UICatalogFromDescription:withContext:")), (IMP)hookCatalogImage);
