@@ -7,7 +7,6 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 ## Inbox
 
-- [ ] **BL-21** `P2 · Medium` **Update notice and one-click update from GitHub:** on launch the app checks the latest GitHub release; if newer, a bar offers Update Now (download, verify our Developer ID signature, replace, relaunch), What's New and Later. Fails silently; never touches the theme. Also BrightMeUp > Check for Updates... in the menu, which always answers. Every release goes to GitHub with BrightMeUp.dmg and BrightMeUp.zip. Adi asked 2026-11-14.
 
 
 
@@ -31,6 +30,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 ## Done
+
+- [x] **BL-21** `P2 · Medium` **Update notice and one-click update from GitHub:** on launch the app checks the latest GitHub release; if newer, a bar offers Update Now (download, verify our Developer ID signature, replace, relaunch), What's New and Later. Fails silently; never touches the theme. Also BrightMeUp > Check for Updates... in the menu, which always answers. Every release goes to GitHub with BrightMeUp.dmg and BrightMeUp.zip. Adi asked 2026-11-14. Published as v1.3.2. · done 2026-11-14
 
 - [x] **BL-20** `P2 · Medium` **README: tested only with Logic Pro 13, in bold:** under the download button and in Requirements. Adi asked 2026-11-14. · done 2026-11-14
 
