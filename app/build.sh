@@ -19,7 +19,7 @@ app='BrightMeUp.app'
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 swiftc -parse-as-library -O -target arm64-apple-macos14 -import-objc-header ../theme/gray-rule.h \
-   -o "$app/Contents/MacOS/BrightMeUp" BrightMeUp.swift Previews.swift || exit 1
+   -o "$app/Contents/MacOS/BrightMeUp" BrightMeUp.swift Previews.swift Updater.swift || exit 1
 cp ../theme/light-theme.dylib "$app/Contents/Resources/"
 # Draws the icon at 1024 points and scales it to each icon size.
 work=$(mktemp -d) || exit 1

@@ -502,6 +502,7 @@ struct ContentView: View {
    @State var isNaming = false
    @State var newName = ""
    @State var isConfirmingRevert = false
+   @StateObject var updater = Updater()
 
    var isWaiting: Bool {
       switch status {
@@ -675,6 +676,7 @@ struct ContentView: View {
          .toolbar(removing: .sidebarToggle)
       } detail: {
          VStack(alignment: .leading, spacing: 14) {
+            UpdateBar(updater: updater)
             HStack(spacing: 12) {
                Text("Preview").font(.headline).fixedSize()
                Picker("Preview", selection: $previewKind) {
@@ -813,6 +815,13 @@ struct ContentView: View {
       }
       .frame(minWidth: WINDOW_SIZE.width, idealWidth: 1180, maxWidth: .infinity, minHeight: WINDOW_SIZE.height,
          idealHeight: 860, maxHeight: .infinity)
+      .task {
+         await updater.check()
+         // BMU_TEST_INSTALL installs an update right away, for testing the update path.
+         if ProcessInfo.processInfo.environment["BMU_TEST_INSTALL"] != nil, case .available(let info) = updater.state {
+            await updater.install(info)
+         }
+      }
       .onReceive(workspace.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { (_) in
          if isWaiting {
             return

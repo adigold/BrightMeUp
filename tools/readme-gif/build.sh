@@ -10,7 +10,7 @@ mkdir "$work/frames"
 # The app icon, drawn by the same code as the app.
 swiftc -O -o "$work/app-icon" app/AppIcon.swift && "$work/app-icon" "$work/icon.png" || exit 1
 swiftc -parse-as-library -O -D GIF_RENDER -target arm64-apple-macos14 -import-objc-header theme/gray-rule.h \
-   -o "$work/render" app/BrightMeUp.swift app/Previews.swift tools/readme-gif/Render.swift || exit 1
+   -o "$work/render" app/BrightMeUp.swift app/Previews.swift app/Updater.swift tools/readme-gif/Render.swift || exit 1
 "$work/render" "$PWD/docs" "$work/icon.png" "$work/frames" || exit 1
 ffmpeg -v error -y -framerate 20 -i "$work/frames/frame-%04d.png" \
    -vf "scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=sierra2_4a" \

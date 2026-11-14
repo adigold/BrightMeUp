@@ -33,6 +33,7 @@ Logic Pro only comes in dark. That is great at night, but in a bright room or on
 - **Live preview.** See the Main window, Tracks, Mixer or Piano Roll change while you move the sliders, and compare Before and After.
 - **Your own presets.** Save your favorite settings and switch in one click.
 - **Back to stock in one click.** Revert to Logic Defaults restarts Logic Pro in its original look. Your settings stay saved for next time.
+- **Always up to date.** When a new version is out, BrightMeUp tells you when you open it and updates itself in one click.
 - **Nothing to undo.** BrightMeUp never changes Logic Pro or your projects. Open Logic Pro from the Dock and it looks exactly like it always did.
 
 | Stock Logic Pro | Light |
