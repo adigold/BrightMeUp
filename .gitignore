@@ -3,3 +3,6 @@
 *.app
 .DS_Store
 .agent-grid/
+build/
+dist/
+CLAUDE.md
