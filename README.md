@@ -11,6 +11,11 @@
 
 
 <p align="center">
+  <a href="https://github.com/adigold/BrightMeUp/releases/latest/download/BrightMeUp.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-FF8C28?style=for-the-badge&logo=apple&logoColor=white" height="48" alt="Download for Mac"></a><br>
+  For Logic Pro 13 on Macs with Apple silicon.
+</p>
+
+<p align="center">
   Powered by <a href="https://inplug.app">InPlug.app</a>
 </p>
 
