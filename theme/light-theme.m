@@ -55,6 +55,12 @@ static ImageRange logicRanges[MAX_RANGES];
 static volatile int logicRangeCount = 0;
 static double grayGamma = GAMMA_DEFAULT;
 static double surfaceMax = SURFACE_MAX_DEFAULT;
+
+// The areas of Logic Pro, in the order of AREA_KEYS. AREA_WINDOWS takes every other color.
+typedef enum { AREA_TRACKS, AREA_MIXER, AREA_EDITORS, AREA_CONTROL_BAR, AREA_INSPECTOR, AREA_BROWSERS, AREA_PLUGINS, AREA_WINDOWS, AREA_COUNT } Area;
+static NSString *const AREA_KEYS[AREA_COUNT] = { @"tracks", @"mixer", @"editors", @"controlbar", @"inspector", @"browsers", @"plugins", @"windows" };
+typedef struct { int mode; double surfaceMax; double gamma; } AreaSetting;
+static AreaSetting areaSettings[AREA_COUNT];
 static NSAppearance *trueAqua;
 static CGColorSpaceRef srgbSpace;
 static NSString *outDir;
@@ -108,11 +114,15 @@ static BOOL isLogicCaller(void *address) {
  * @param alpha CGFloat - opacity from 0 to 1
  * @return CGFloat - the new gray level
  */
-static CGFloat mapGray(CGFloat white, CGFloat alpha) {
+static CGFloat mapGrayWith(CGFloat white, CGFloat alpha, double lightest, double gamma) {
    if (alpha < 1 && white < SHADOW_LIMIT) {
       return white;
    }
-   return mapGrayLevel(white, surfaceMax, grayGamma);
+   return mapGrayLevel(white, lightest, gamma);
+}
+
+static CGFloat mapGray(CGFloat white, CGFloat alpha) {
+   return mapGrayWith(white, alpha, surfaceMax, grayGamma);
 }
 
 static BOOL isGrayish(CGFloat r, CGFloat g, CGFloat b) {
@@ -177,9 +187,9 @@ static BOOL isWell(NSString *name) {
 }
 
 // The gray mapping makes the selected row darker than the rows around it, and the playhead black.
-static CGFloat fixedGray(NSString *name) {
+static CGFloat fixedGray(NSString *name, double lightest) {
    if ([name isEqualToString:@"TrackHeaderBackgroundSelected"]) {
-      return SELECTED_ROW_WHITE * surfaceMax;
+      return SELECTED_ROW_WHITE * lightest;
    }
    return [name isEqualToString:@"PlayheadLineNormal"] ? PLAYHEAD_WHITE : -1;
 }
@@ -190,14 +200,72 @@ static BOOL isBrightVariant(NSString *name) {
    return [name hasSuffix:@"_Bright"] || [name hasSuffix:@"BrightColor"];
 }
 
+static BOOL hasAnyPrefix(NSString *name, NSArray<NSString *> *prefixes) {
+   for (NSString *prefix in prefixes) {
+      if ([name hasPrefix:prefix]) {
+         return YES;
+      }
+   }
+   return NO;
+}
+
 /**
- * Returns a copy of a color mapped for the light theme. Saturated colors do not change.
+ * Finds the area of Logic Pro that a catalog color belongs to, from its name.
+ *
+ * @param fullName NSString * - the catalog color name
+ * @return Area - the area, or AREA_WINDOWS for shared colors
+ */
+static Area areaOfColor(NSString *fullName) {
+   NSString *name = [fullName hasPrefix:@"Colors/"] ? [fullName substringFromIndex:7] : fullName;
+
+   if ([name containsString:@"Plugin"] || hasAnyPrefix(name, @[ @"Amp", @"Compressor", @"Stompbox", @"Vintage", @"Pepper", @"Mastering", @"Retro", @"QuickSampler", @"Teeth", @"Quincy", @"Tycho", @"Remix", @"Sculpture", @"Alchemy", @"ES1", @"ES2", @"Studio", @"BeatBreaker", @"DrumSynth", @"DPad", @"MPad", @"Pad", @"String", @"Tuner", @"Linear", @"Dolby", @"SampleAlchemy", @"StepFX", @"SessionPlayer", @"Generic", @"GraphPanel", @"Metering", @"Graph" ])) {
+      return AREA_PLUGINS;
+   }
+   if ([name containsString:@"Controlbar"] || hasAnyPrefix(name, @[ @"Transport", @"Control", @"Jogwheel", @"TopBevel", @"NumPad", @"PageControl" ])) {
+      return AREA_CONTROL_BAR;
+   }
+   if (hasAnyPrefix(name, @[ @"Mixer", @"HCS", @"VCS", @"CStrips", @"SStrips", @"Strips", @"Channelstrip", @"Knob" ])) {
+      return AREA_MIXER;
+   }
+   if (hasAnyPrefix(name, @[ @"PianoRoll", @"Piano", @"Score", @"StepSequencer", @"Beats", @"Editor", @"ListEditor", @"Pitch", @"Transform", @"SmartTempo", @"CellEditor", @"KeyNote", @"ActiveEdit", @"SpotErase", @"GIEditor" ])) {
+      return AREA_EDITORS;
+   }
+   if (hasAnyPrefix(name, @[ @"Inspector", @"Smartcontrols", @"Widget", @"MIDILearn" ])) {
+      return AREA_INSPECTOR;
+   }
+   if (hasAnyPrefix(name, @[ @"Library", @"Browser", @"ContentBrowser", @"TWR", @"Tableview", @"Table", @"Preview", @"Assistant", @"Sub", @"NewTrackSheet", @"Tenzing", @"File", @"Loop", @"CNProject" ])) {
+      return AREA_BROWSERS;
+   }
+   if (hasAnyPrefix(name, @[ @"TrackHeader", @"Track", @"Region", @"SPRegion", @"Arrange", @"Ruler", @"Playhead", @"Grid", @"Automation", @"Flex", @"Takes", @"GlobalTracks", @"OneTrack", @"Drop", @"LiveLoops", @"Freeze" ])) {
+      return AREA_TRACKS;
+   }
+   return AREA_WINDOWS;
+}
+
+static CGColorRef copyMappedColorWith(CGColorRef color, NSString *name, double surfaceMax, double grayGamma);
+
+/**
+ * Returns a copy of a color mapped for the light theme, with the values of the area of the color.
+ * Saturated colors do not change.
  *
  * @param color CGColorRef - the original color
  * @param name NSString * - the catalog color name
  * @return CGColorRef - a retained color, or NULL if the color does not change
  */
 static CGColorRef copyMappedColor(CGColorRef color, NSString *name) {
+   AreaSetting area = areaSettings[areaOfColor(name)];
+
+   if (area.mode == AREA_MODE_ORIGINAL) {
+      return NULL;
+   }
+   if (area.mode == AREA_MODE_CUSTOM) {
+      return copyMappedColorWith(color, name, area.surfaceMax, area.gamma);
+   }
+   return copyMappedColorWith(color, name, surfaceMax, grayGamma);
+}
+
+// The parameters shadow the globals on purpose, so the body maps with the values of one area.
+static CGColorRef copyMappedColorWith(CGColorRef color, NSString *name, double surfaceMax, double grayGamma) {
    CGColorRef rgb = CGColorCreateCopyByMatchingToColorSpace(srgbSpace, kCGRenderingIntentDefault, color, NULL);
    const CGFloat *c = rgb ? CGColorGetComponents(rgb) : NULL;
    CGColorRef mapped = NULL;
@@ -216,8 +284,9 @@ static CGColorRef copyMappedColor(CGColorRef color, NSString *name) {
          CGFloat values[4] = { FOCUSED_ROW_COLOR[0] * surfaceMax, FOCUSED_ROW_COLOR[1] * surfaceMax, FOCUSED_ROW_COLOR[2] * surfaceMax, c[3] };
 
          mapped = CGColorCreate(srgbSpace, values);
-      } else if (fixedGray(name) >= 0) {
-         CGFloat values[4] = { fixedGray(name), fixedGray(name), fixedGray(name), c[3] };
+      } else if (fixedGray(name, surfaceMax) >= 0) {
+         CGFloat gray = fixedGray(name, surfaceMax);
+         CGFloat values[4] = { gray, gray, gray, c[3] };
 
          mapped = CGColorCreate(srgbSpace, values);
       } else if (isAccent(name)) {
@@ -235,7 +304,7 @@ static CGColorRef copyMappedColor(CGColorRef color, NSString *name) {
 
          mapped = CGColorCreate(srgbSpace, values);
       } else if (spread < GRAY_SPREAD) {
-         CGFloat white = mapGray(level, c[3]);
+         CGFloat white = mapGrayWith(level, c[3], surfaceMax, grayGamma);
          CGFloat alpha = isTextLabel(name) ? pow(c[3], TEXT_ALPHA_GAMMA) : c[3];
          CGFloat values[4] = { white, white, white, alpha };
 
@@ -1135,6 +1204,28 @@ static double readSetting(const char *envName, NSString *key, double fallback, d
 }
 
 /**
+ * Reads the settings of each area from the preferences. A missing or bad value means the area
+ * follows the overall values.
+ */
+static void readAreaSettings(void) {
+   NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:SETTINGS_DOMAIN];
+
+   for (int i = 0; i < AREA_COUNT; i++) {
+      NSString *prefix = [NSString stringWithFormat:@"area.%@.", AREA_KEYS[i]];
+      id mode = [defaults objectForKey:[prefix stringByAppendingString:@"mode"]];
+      id lightest = [defaults objectForKey:[prefix stringByAppendingString:@"surfaceMax"]];
+      id gamma = [defaults objectForKey:[prefix stringByAppendingString:@"gamma"]];
+
+      areaSettings[i].mode = [mode respondsToSelector:@selector(intValue)] ? [mode intValue] : AREA_MODE_OVERALL;
+      if (areaSettings[i].mode < AREA_MODE_OVERALL || areaSettings[i].mode > AREA_MODE_ORIGINAL) {
+         areaSettings[i].mode = AREA_MODE_OVERALL;
+      }
+      areaSettings[i].surfaceMax = fmin(1, fmax(SURFACE_MAX_MIN, [lightest respondsToSelector:@selector(doubleValue)] ? [lightest doubleValue] : surfaceMax));
+      areaSettings[i].gamma = fmin(GAMMA_MAX, fmax(GAMMA_MIN, [gamma respondsToSelector:@selector(doubleValue)] ? [gamma doubleValue] : grayGamma));
+   }
+}
+
+/**
  * Adds the colors in the JSON output of assetutil and their appearances to a shared table.
  *
  * @param output NSData * - the output of assetutil --info
@@ -1243,6 +1334,7 @@ __attribute__((constructor)) static void start(void) {
    }
    grayGamma = readSetting("LP_GAMMA", @"gamma", grayGamma, GAMMA_MIN, GAMMA_MAX);
    surfaceMax = readSetting("LP_SURFACE_MAX", @"surfaceMax", surfaceMax, SURFACE_MAX_MIN, 1);
+   readAreaSettings();
    srgbSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
    singleAppearanceNames = listSingleAppearanceNames();
    trueAqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];

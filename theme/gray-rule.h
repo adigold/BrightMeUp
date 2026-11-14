@@ -11,6 +11,11 @@
 #define GAMMA_DEFAULT 0.75
 // The selected row in a list is this fraction of the lightest gray.
 #define SELECTED_ROW_WHITE 0.95
+// Each area of Logic Pro can follow the overall values, use its own values, or keep the original
+// Logic Pro colors. The app stores area.<key>.mode, area.<key>.surfaceMax and area.<key>.gamma.
+#define AREA_MODE_OVERALL 0
+#define AREA_MODE_CUSTOM 1
+#define AREA_MODE_ORIGINAL 2
 // The preferences domain of the launcher app, which is also its bundle identifier.
 #define SETTINGS_DOMAIN_NAME "com.adigoldstein.brightmeup"
 

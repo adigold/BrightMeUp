@@ -62,6 +62,12 @@ The first launch with the theme takes about one second longer. The theme then re
 
 The preview in the app shows some Logic Pro tracks with the current values. The app paints it with the same gray rule as the theme, so it is close to what Logic Pro shows. If Logic Pro is open or if Logic Pro changed after the build, the status line at the bottom tells you what to do.
 
+## Areas and presets
+
+The Areas tab splits Logic Pro into eight parts: the Tracks area, the Mixer, the Editors, the Control bar, the Inspector and Smart Controls, the Browsers and library, the Plug-in windows, and the shared Windows and panels. Each part can follow the overall values, use its own Lightness and Middle grays, or keep the original Logic Pro colors. Images and some fixed colors inside Logic Pro always follow the overall values.
+
+The sidebar has 30 presets in six groups (Bright, Balanced, Dim, High contrast, Low contrast, By area). Save as Preset (Command S) keeps your own, areas included. Reset to Default (Command 0) puts everything back to the Light preset.
+
 ## Change the brightness
 
 You decide how light the theme is. A white interface is good in a bright room, but many people find it too bright for long sessions. You can make all the surfaces darker and keep the text black, or select a point between the two.

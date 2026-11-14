@@ -8,8 +8,11 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 ## Inbox
 
 
+
 ## Now
 
 ## Done
+
+- [x] **BL-2** `P1 · High` **Per-area control and many presets:** let the user set lightness and contrast separately for each part of Logic Pro (tracks, mixer, editors, inspector, browsers, control bar, windows), or keep a part dark, and ship a large preset library. Adi asked 2026-11-14. Shipped as 1.1.0: 8 areas (Overall / Custom / Original each), 30 presets in 6 groups, presets save areas. · done 2026-11-14
 
 - [x] **BL-1** `P1 · High` **Make BrightMeUp our own Mac app:** take the MIT-licensed i-see-logic-pro light theme for Logic Pro, rebrand it as BrightMeUp (name, bundle id, icon, docs), build it and put the app in Applications. Adi asked 2026-11-14. Also: 6 presets, saved presets, Reset to Default, fine steps, Before/After preview, Developer ID signed and notarized. · done 2026-11-14

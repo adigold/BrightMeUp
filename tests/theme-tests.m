@@ -49,6 +49,34 @@ static void testSettings(void) {
    check(isClose(readSetting(name, key, 0.75, GAMMA_MIN, GAMMA_MAX), 0.75), "the fallback is used");
 }
 
+static void testAreas(void) {
+   CGFloat dark[4] = { 0.2, 0.2, 0.2, 1 };
+   CGColorRef color;
+   CGColorRef mapped;
+
+   srgbSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+   color = CGColorCreate(srgbSpace, dark);
+   check(areaOfColor(@"MixerFaderTrack") == AREA_MIXER, "a mixer color is in the mixer area");
+   check(areaOfColor(@"Colors/PianoRoll/Grid") == AREA_EDITORS, "a Colors/ prefix is ignored");
+   check(areaOfColor(@"ChannelEQPluginBypassGlyphOn") == AREA_PLUGINS, "a plug-in color is in the plug-ins area");
+   check(areaOfColor(@"TrackHeaderBackground") == AREA_TRACKS, "a track header color is in the tracks area");
+   check(areaOfColor(@"TransportDisplayBackground") == AREA_CONTROL_BAR, "a transport color is in the control bar area");
+   check(areaOfColor(@"BackgroundWorkspace") == AREA_WINDOWS, "other colors are in the windows area");
+   surfaceMax = 1;
+   grayGamma = 1;
+   areaSettings[AREA_MIXER] = (AreaSetting){ AREA_MODE_ORIGINAL, 1, 1 };
+   check(copyMappedColor(color, @"MixerFaderTrack") == NULL, "an original area keeps its colors");
+   areaSettings[AREA_MIXER] = (AreaSetting){ AREA_MODE_CUSTOM, 0.5, 1 };
+   mapped = copyMappedColor(color, @"MixerSlotBackground");
+   check(mapped && isClose(CGColorGetComponents(mapped)[0], 0.4), "a custom area uses its own values");
+   CGColorRelease(mapped);
+   mapped = copyMappedColor(color, @"BackgroundWorkspace");
+   check(mapped && isClose(CGColorGetComponents(mapped)[0], 0.8), "an area that follows uses the overall values");
+   CGColorRelease(mapped);
+   areaSettings[AREA_MIXER] = (AreaSetting){ AREA_MODE_OVERALL, 1, 1 };
+   CGColorRelease(color);
+}
+
 static void testFieldColors(void) {
    NSColor *dark = [NSColor colorWithSRGBRed:0.2 green:0.2 blue:0.2 alpha:1];
    NSColor *light = [NSColor colorWithSRGBRed:0.9 green:0.9 blue:0.9 alpha:1];
@@ -84,6 +112,7 @@ int main(void) {
       testGrayRule();
       testSettings();
       testFieldColors();
+      testAreas();
       testColorList();
    }
    printf(failures ? "%d tests failed\n" : "All tests passed\n", failures);

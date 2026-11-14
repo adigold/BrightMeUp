@@ -10,8 +10,8 @@ let SURFACE_RANGE = SURFACE_MAX_MIN...1.0
 let GAMMA_RANGE = GAMMA_MIN...GAMMA_MAX
 let PRESET_MATCH = 0.005
 let CUSTOM = "Custom"
-let WINDOW_SIZE = CGSize(width: 780, height: 500)
-let SIDEBAR_WIDTH = 190.0
+let WINDOW_SIZE = CGSize(width: 940, height: 680)
+let SIDEBAR_WIDTH = 230.0
 let HEADER_WIDTH = 290.0
 let ROW_HEIGHT = 34.0
 let RULER_HEIGHT = 20.0
@@ -31,21 +31,98 @@ let STOCK_RULER = 0.25
 let STOCK_LETTER = 0.9
 let STOCK_TEXT = 1.0
 
+struct AreaValue: Codable, Equatable {
+   var mode: Int
+   var surfaceMax: Double
+   var gamma: Double
+}
+
+struct AreaInfo: Identifiable {
+   let key: String
+   let name: String
+   let summary: String
+   let symbol: String
+   var id: String { return key }
+}
+
+// The keys match AREA_KEYS in theme/light-theme.m.
+let AREAS = [
+   AreaInfo(key: "tracks", name: "Tracks area", summary: "Track headers, regions, ruler, automation, Live Loops",
+      symbol: "rectangle.split.3x1"),
+   AreaInfo(key: "mixer", name: "Mixer", summary: "Channel strips, faders, meters, sends", symbol: "slider.vertical.3"),
+   AreaInfo(key: "editors", name: "Editors", summary: "Piano Roll, Score, Step Sequencer, Event List, Flex Pitch",
+      symbol: "pianokeys"),
+   AreaInfo(key: "controlbar", name: "Control bar", summary: "Transport, display, tempo and counters", symbol: "playpause"),
+   AreaInfo(key: "inspector", name: "Inspector and Smart Controls", summary: "Region and track inspector, Smart Controls",
+      symbol: "info.circle"),
+   AreaInfo(key: "browsers", name: "Browsers and library", summary: "Library, Loop and File browsers, new track sheet",
+      symbol: "folder"),
+   AreaInfo(key: "plugins", name: "Plug-in windows", summary: "Stock instruments and effects", symbol: "waveform"),
+   AreaInfo(key: "windows", name: "Windows and panels", summary: "Shared backgrounds, dividers, buttons, text",
+      symbol: "macwindow"),
+]
+
+let OVERALL = AreaValue(mode: Int(AREA_MODE_OVERALL), surfaceMax: SURFACE_MAX_DEFAULT, gamma: GAMMA_DEFAULT)
+let ORIGINAL = AreaValue(mode: Int(AREA_MODE_ORIGINAL), surfaceMax: SURFACE_MAX_DEFAULT, gamma: GAMMA_DEFAULT)
+
+func custom(_ s: Double, _ g: Double) -> AreaValue {
+   return AreaValue(mode: Int(AREA_MODE_CUSTOM), surfaceMax: s, gamma: g)
+}
+
 struct Preset: Identifiable {
    let name: String
+   let group: String
    let summary: String
    let surfaceMax: Double
    let gamma: Double
+   var areas: [String: AreaValue] = [:]
    var id: String { return name }
 }
 
+let PRESET_GROUPS = [ "Bright", "Balanced", "Dim", "High contrast", "Low contrast", "By area" ]
+
 let PRESETS = [
-   Preset(name: "Light", summary: "Default", surfaceMax: SURFACE_MAX_DEFAULT, gamma: GAMMA_DEFAULT),
-   Preset(name: "Paper", summary: "Bright, airy", surfaceMax: 0.97, gamma: 0.55),
-   Preset(name: "Soft", summary: "Dimmer grays", surfaceMax: 0.85, gamma: 0.85),
-   Preset(name: "Studio", summary: "Long sessions", surfaceMax: 0.76, gamma: 1.1),
-   Preset(name: "Gray", summary: "Middle gray", surfaceMax: 0.68, gamma: 1),
-   Preset(name: "Dusk", summary: "Darkest", surfaceMax: 0.56, gamma: 1.35),
+   Preset(name: "Light", group: "Bright", summary: "Default", surfaceMax: SURFACE_MAX_DEFAULT, gamma: GAMMA_DEFAULT),
+   Preset(name: "Paper", group: "Bright", summary: "Bright, airy", surfaceMax: 0.97, gamma: 0.55),
+   Preset(name: "Snow", group: "Bright", summary: "Whitest grays", surfaceMax: 1, gamma: 0.45),
+   Preset(name: "Daylight", group: "Bright", summary: "Bright room", surfaceMax: 1, gamma: 0.62),
+   Preset(name: "Morning", group: "Bright", summary: "Bright, a bit softer", surfaceMax: 0.94, gamma: 0.7),
+   Preset(name: "Soft", group: "Balanced", summary: "Dimmer grays", surfaceMax: 0.85, gamma: 0.85),
+   Preset(name: "Linen", group: "Balanced", summary: "Light, calm", surfaceMax: 0.9, gamma: 0.8),
+   Preset(name: "Mist", group: "Balanced", summary: "Light, flat", surfaceMax: 0.88, gamma: 0.65),
+   Preset(name: "Studio", group: "Balanced", summary: "Long sessions", surfaceMax: 0.76, gamma: 1.1),
+   Preset(name: "Slate", group: "Balanced", summary: "Deeper grays", surfaceMax: 0.8, gamma: 1.2),
+   Preset(name: "Gray", group: "Balanced", summary: "Middle gray", surfaceMax: 0.68, gamma: 1),
+   Preset(name: "Dusk", group: "Dim", summary: "Dim", surfaceMax: 0.56, gamma: 1.35),
+   Preset(name: "Evening", group: "Dim", summary: "Late sessions", surfaceMax: 0.62, gamma: 1.2),
+   Preset(name: "Twilight", group: "Dim", summary: "Dimmer", surfaceMax: 0.53, gamma: 1.5),
+   Preset(name: "Night Light", group: "Dim", summary: "Darkest", surfaceMax: 0.5, gamma: 1.8),
+   Preset(name: "Contrast", group: "High contrast", summary: "Strong separation", surfaceMax: 1, gamma: 1.4),
+   Preset(name: "Bold", group: "High contrast", summary: "Darker controls", surfaceMax: 0.92, gamma: 1.6),
+   Preset(name: "Ink", group: "High contrast", summary: "Maximum contrast", surfaceMax: 0.96, gamma: 2),
+   Preset(name: "Gentle", group: "Low contrast", summary: "Soft edges", surfaceMax: 0.92, gamma: 0.45),
+   Preset(name: "Haze", group: "Low contrast", summary: "Flat, quiet", surfaceMax: 0.8, gamma: 0.4),
+   Preset(name: "Fog", group: "Low contrast", summary: "Flat, dim", surfaceMax: 0.7, gamma: 0.35),
+   Preset(name: "Dark Plug-ins", group: "By area", summary: "Light, plug-ins stay dark", surfaceMax: SURFACE_MAX_DEFAULT,
+      gamma: GAMMA_DEFAULT, areas: [ "plugins": ORIGINAL ]),
+   Preset(name: "Producer", group: "By area", summary: "Bright editors, dark plug-ins", surfaceMax: 0.9, gamma: 0.8,
+      areas: [ "editors": custom(1, 0.6), "plugins": ORIGINAL ]),
+   Preset(name: "Mix Engineer", group: "By area", summary: "Calm mixer, dark plug-ins", surfaceMax: 0.85, gamma: 0.85,
+      areas: [ "mixer": custom(0.78, 1.05), "plugins": ORIGINAL ]),
+   Preset(name: "Focus Tracks", group: "By area", summary: "Bright tracks, dim the rest", surfaceMax: 0.66, gamma: 1.1,
+      areas: [ "tracks": custom(1, 0.75) ]),
+   Preset(name: "Bright Editors", group: "By area", summary: "Soft, editors brighter", surfaceMax: 0.85, gamma: 0.85,
+      areas: [ "editors": custom(1, 0.6) ]),
+   Preset(name: "Dim Mixer", group: "By area", summary: "Light, mixer dimmer", surfaceMax: SURFACE_MAX_DEFAULT,
+      gamma: GAMMA_DEFAULT, areas: [ "mixer": custom(0.7, 1.1) ]),
+   Preset(name: "Calm Panels", group: "By area", summary: "Dim inspector and browsers", surfaceMax: SURFACE_MAX_DEFAULT,
+      gamma: GAMMA_DEFAULT, areas: [ "inspector": custom(0.82, 1), "browsers": custom(0.82, 1) ]),
+   Preset(name: "Bold Control Bar", group: "By area", summary: "Contrast in the control bar", surfaceMax: 0.9,
+      gamma: 0.8, areas: [ "controlbar": custom(0.96, 1.6) ]),
+   Preset(name: "Night Session", group: "By area", summary: "Dim, tracks lifted, dark plug-ins", surfaceMax: 0.56,
+      gamma: 1.35, areas: [ "tracks": custom(0.7, 1.1), "plugins": ORIGINAL ]),
+   Preset(name: "Score Writer", group: "By area", summary: "Paper-white editors", surfaceMax: 0.8, gamma: 1,
+      areas: [ "editors": custom(1, 0.45) ]),
 ]
 let USER_TAG = "user:"
 
@@ -53,6 +130,8 @@ struct SavedPreset: Codable, Identifiable {
    let name: String
    let surfaceMax: Double
    let gamma: Double
+   // Missing in presets saved before areas existed.
+   var areas: [String: AreaValue]?
    var id: String { return USER_TAG + name }
 }
 
@@ -64,6 +143,78 @@ struct SavedPreset: Codable, Identifiable {
  */
 func decodeSaved(_ json: String) -> [SavedPreset] {
    return (try? JSONDecoder().decode([SavedPreset].self, from: Data(json.utf8))) ?? []
+}
+
+/**
+ * Keeps the setting of each area in the preferences, as area.<key>.mode, area.<key>.surfaceMax
+ * and area.<key>.gamma. The theme reads the same keys.
+ */
+final class AreaStore: ObservableObject {
+   @Published var values: [String: AreaValue] {
+      didSet { save() }
+   }
+
+   init() {
+      let defaults = UserDefaults.standard
+      var loaded: [String: AreaValue] = [:]
+
+      for area in AREAS {
+         let prefix = "area.\(area.key)."
+
+         loaded[area.key] = AreaValue(
+            mode: defaults.object(forKey: prefix + "mode") as? Int ?? Int(AREA_MODE_OVERALL),
+            surfaceMax: defaults.object(forKey: prefix + "surfaceMax") as? Double ?? SURFACE_MAX_DEFAULT,
+            gamma: defaults.object(forKey: prefix + "gamma") as? Double ?? GAMMA_DEFAULT)
+      }
+      values = loaded
+   }
+
+   func save() {
+      let defaults = UserDefaults.standard
+
+      for (key, value) in values {
+         defaults.set(value.mode, forKey: "area.\(key).mode")
+         defaults.set(value.surfaceMax, forKey: "area.\(key).surfaceMax")
+         defaults.set(value.gamma, forKey: "area.\(key).gamma")
+      }
+   }
+
+   subscript(key: String) -> AreaValue {
+      get { return values[key] ?? OVERALL }
+      set { values[key] = newValue }
+   }
+
+   /**
+    * Reports if the areas match a preset. Values only count for custom areas.
+    *
+    * @param areas [String: AreaValue] - the areas of the preset; a missing area follows the overall values
+    * @return Bool - true if every area matches
+    */
+   func matches(_ areas: [String: AreaValue]) -> Bool {
+      return AREAS.allSatisfy { (area) in
+         let mine = self[area.key]
+         let theirs = areas[area.key] ?? OVERALL
+
+         if mine.mode != theirs.mode {
+            return false
+         }
+         return mine.mode != Int(AREA_MODE_CUSTOM) || (abs(mine.surfaceMax - theirs.surfaceMax) < PRESET_MATCH
+            && abs(mine.gamma - theirs.gamma) < PRESET_MATCH)
+      }
+   }
+
+   func setAll(_ areas: [String: AreaValue]) {
+      var next: [String: AreaValue] = [:]
+
+      for area in AREAS {
+         next[area.key] = areas[area.key] ?? OVERALL
+      }
+      values = next
+   }
+
+   var customized: [String: AreaValue] {
+      return values.filter { (_, value) in return value.mode != Int(AREA_MODE_OVERALL) }
+   }
 }
 
 struct MockTrack: Identifiable {
@@ -310,6 +461,8 @@ struct ContentView: View {
    @AppStorage("surfaceMax") var surfaceMax = SURFACE_MAX_DEFAULT
    @AppStorage("gamma") var gamma = GAMMA_DEFAULT
    @AppStorage("savedPresets") var savedJSON = "[]"
+   @AppStorage("tab") var tab = "overall"
+   @StateObject var areas = AreaStore()
    @State var status = getLaunchStatus()
    @State var columns = NavigationSplitViewVisibility.all
    @State var showsStock = false
@@ -322,17 +475,18 @@ struct ContentView: View {
 
    var isDefault: Bool {
       return abs(surfaceMax - SURFACE_MAX_DEFAULT) < PRESET_MATCH && abs(gamma - GAMMA_DEFAULT) < PRESET_MATCH
+         && areas.customized.isEmpty
    }
 
    var presetName: String {
-      let matches = { (s: Double, g: Double) in
-         return abs(s - surfaceMax) < PRESET_MATCH && abs(g - gamma) < PRESET_MATCH
+      let matches = { (s: Double, g: Double, a: [String: AreaValue]) in
+         return abs(s - surfaceMax) < PRESET_MATCH && abs(g - gamma) < PRESET_MATCH && areas.matches(a)
       }
 
-      if let p = PRESETS.first(where: { (p) in return matches(p.surfaceMax, p.gamma) }) {
+      if let p = PRESETS.first(where: { (p) in return matches(p.surfaceMax, p.gamma, p.areas) }) {
          return p.name
       }
-      if let p = saved.first(where: { (p) in return matches(p.surfaceMax, p.gamma) }) {
+      if let p = saved.first(where: { (p) in return matches(p.surfaceMax, p.gamma, p.areas ?? [:]) }) {
          return p.id
       }
       return CUSTOM
@@ -343,26 +497,52 @@ struct ContentView: View {
          get: { return presetName },
          set: { (name) in
             if let p = PRESETS.first(where: { (p) in return p.name == name }) {
-               apply(p.surfaceMax, p.gamma)
+               apply(p.surfaceMax, p.gamma, p.areas)
             } else if let p = saved.first(where: { (p) in return p.id == name }) {
-               apply(p.surfaceMax, p.gamma)
+               apply(p.surfaceMax, p.gamma, p.areas ?? [:])
             }
          }
       )
    }
 
-   func apply(_ s: Double, _ g: Double) {
-      surfaceMax = min(max(s, SURFACE_RANGE.lowerBound), SURFACE_RANGE.upperBound)
-      gamma = min(max(g, GAMMA_RANGE.lowerBound), GAMMA_RANGE.upperBound)
+   /**
+    * The values that paint the preview: the tracks area values, or the stock grays.
+    */
+   var previewTheme: ThemeValues {
+      let tracks = areas["tracks"]
+
+      if showsStock || tracks.mode == Int(AREA_MODE_ORIGINAL) {
+         return ThemeValues(surfaceMax: surfaceMax, gamma: gamma, isStock: true)
+      }
+      if tracks.mode == Int(AREA_MODE_CUSTOM) {
+         return ThemeValues(surfaceMax: tracks.surfaceMax, gamma: tracks.gamma)
+      }
+      return ThemeValues(surfaceMax: surfaceMax, gamma: gamma)
+   }
+
+   func apply(_ s: Double, _ g: Double, _ a: [String: AreaValue]) {
+      surfaceMax = clamp(s, SURFACE_RANGE)
+      gamma = clamp(g, GAMMA_RANGE)
+      areas.setAll(a)
+   }
+
+   func clamp(_ value: Double, _ range: ClosedRange<Double>) -> Double {
+      return min(max(value, range.lowerBound), range.upperBound)
    }
 
    func resetToDefault() {
-      apply(SURFACE_MAX_DEFAULT, GAMMA_DEFAULT)
+      apply(SURFACE_MAX_DEFAULT, GAMMA_DEFAULT, [:])
+   }
+
+   func store(_ list: [SavedPreset]) {
+      if let data = try? JSONEncoder().encode(list), let json = String(data: data, encoding: .utf8) {
+         savedJSON = json
+      }
    }
 
    /**
-    * Saves the current values as a preset with the typed name. A preset with the same name
-    * is replaced.
+    * Saves the current values and areas as a preset with the typed name. A preset with the same
+    * name is replaced.
     */
    func savePreset() {
       let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -373,18 +553,12 @@ struct ContentView: View {
       if name.isEmpty {
          return
       }
-      list.append(SavedPreset(name: name, surfaceMax: surfaceMax, gamma: gamma))
-      if let data = try? JSONEncoder().encode(list), let json = String(data: data, encoding: .utf8) {
-         savedJSON = json
-      }
+      list.append(SavedPreset(name: name, surfaceMax: surfaceMax, gamma: gamma, areas: areas.customized))
+      store(list)
    }
 
    func deletePreset(_ preset: SavedPreset) {
-      let list = saved.filter { (p) in return p.id != preset.id }
-
-      if let data = try? JSONEncoder().encode(list), let json = String(data: data, encoding: .utf8) {
-         savedJSON = json
-      }
+      store(saved.filter { (p) in return p.id != preset.id })
    }
 
    var body: some View {
@@ -392,27 +566,33 @@ struct ContentView: View {
 
       NavigationSplitView(columnVisibility: $columns) {
          List(selection: selection) {
-            ForEach(PRESETS) { (p) in
-               presetRow(name: p.name, summary: p.summary, surface: p.surfaceMax).tag(p.name)
-            }
-            if !saved.isEmpty {
-               Section("My presets") {
-                  ForEach(saved) { (p) in
-                     presetRow(name: p.name, summary: "Saved", surface: p.surfaceMax).tag(p.id)
-                        .contextMenu {
-                           Button("Delete \(p.name)", role: .destructive) { deletePreset(p) }
-                        }
+            ForEach(PRESET_GROUPS, id: \.self) { (group) in
+               Section(group) {
+                  ForEach(PRESETS.filter { (p) in return p.group == group }) { (p) in
+                     presetRow(name: p.name, summary: p.summary, surface: p.surfaceMax, hasAreas: !p.areas.isEmpty)
+                        .tag(p.name)
                   }
                }
             }
-            presetRow(name: CUSTOM, summary: "Your own values", surface: surfaceMax).tag(CUSTOM)
+            Section("My presets") {
+               ForEach(saved) { (p) in
+                  presetRow(name: p.name, summary: "Saved", surface: p.surfaceMax, hasAreas: !(p.areas ?? [:]).isEmpty)
+                     .tag(p.id)
+                     .contextMenu {
+                        Button("Delete \(p.name)", role: .destructive) { deletePreset(p) }
+                     }
+               }
+               presetRow(name: CUSTOM, summary: "Your own values", surface: surfaceMax, hasAreas: false).tag(CUSTOM)
+            }
          }
          .navigationSplitViewColumnWidth(SIDEBAR_WIDTH)
          .toolbar(removing: .sidebarToggle)
       } detail: {
-         VStack(alignment: .leading, spacing: 16) {
+         VStack(alignment: .leading, spacing: 14) {
             HStack {
                Text("Preview").font(.headline)
+               Text(areas["tracks"].mode == Int(AREA_MODE_OVERALL) ? "" : "Tracks area values")
+                  .font(.caption).foregroundStyle(.secondary)
                Spacer()
                Picker("Preview", selection: $showsStock) {
                   Text("Before").tag(true)
@@ -423,17 +603,19 @@ struct ContentView: View {
                .frame(width: 150)
                .help("Before shows stock Logic Pro. After shows your theme.")
             }
-            MockStrip(theme: ThemeValues(surfaceMax: surfaceMax, gamma: gamma, isStock: showsStock))
+            MockStrip(theme: previewTheme)
                .accessibilityElement(children: .ignore)
                .accessibilityLabel(showsStock ? "Preview of stock Logic Pro tracks"
-                  : "Preview of Logic Pro tracks at \(percent(surfaceMax)) lightness")
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 12) {
-               sliderRow("Lightness", value: $surfaceMax, range: SURFACE_RANGE, low: "Dark", high: "Light",
-                  shown: percent(surfaceMax), step: 0.01, defaultValue: SURFACE_MAX_DEFAULT)
-               sliderRow("Middle grays", value: $gamma, range: GAMMA_RANGE, low: "Light", high: "Dark",
-                  shown: String(format: "%.2f", gamma), step: 0.05, defaultValue: GAMMA_DEFAULT)
-            }
-            HStack(spacing: 8) {
+                  : "Preview of Logic Pro tracks with your theme")
+            HStack {
+               Picker("Settings", selection: $tab) {
+                  Text("Overall").tag("overall")
+                  Text("Areas").tag("areas")
+               }
+               .pickerStyle(.segmented)
+               .labelsHidden()
+               .frame(width: 200)
+               Spacer()
                Button {
                   resetToDefault()
                } label: {
@@ -441,7 +623,7 @@ struct ContentView: View {
                }
                .keyboardShortcut("0", modifiers: .command)
                .disabled(isDefault)
-               .help("Back to the default Light values (Command 0)")
+               .help("Back to the default Light values for everything (Command 0)")
                Button {
                   newName = presetName == CUSTOM ? "" : presetName
                   isNaming = true
@@ -457,7 +639,19 @@ struct ContentView: View {
                   .padding(12)
                }
             }
-            Spacer(minLength: 0)
+            if tab == "areas" {
+               areaList
+            } else {
+               Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 12) {
+                  sliderRow("Lightness", value: $surfaceMax, range: SURFACE_RANGE, low: "Dark", high: "Light",
+                     shown: percent(surfaceMax), step: 0.01, defaultValue: SURFACE_MAX_DEFAULT)
+                  sliderRow("Middle grays", value: $gamma, range: GAMMA_RANGE, low: "Light", high: "Dark",
+                     shown: String(format: "%.2f", gamma), step: 0.05, defaultValue: GAMMA_DEFAULT)
+               }
+               Text("These values apply to every area that follows Overall. Use Areas to change one part of Logic Pro on its own.")
+                  .font(.caption).foregroundStyle(.secondary)
+               Spacer(minLength: 0)
+            }
             HStack(spacing: 8) {
                Image(systemName: status.symbol).foregroundStyle(status.tint)
                Text(status.text).foregroundStyle(.secondary).lineLimit(2)
@@ -480,7 +674,99 @@ struct ContentView: View {
       }
    }
 
-   func presetRow(name: String, summary: String, surface: Double) -> some View {
+   var areaList: some View {
+      return VStack(alignment: .leading, spacing: 6) {
+         HStack {
+            Text("Overall follows the Overall tab. Custom gives the area its own values. Original keeps the Logic Pro colors of that area.")
+               .font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button("All to Overall") { areas.setAll([:]) }
+               .controlSize(.small)
+               .disabled(areas.customized.isEmpty)
+         }
+         ScrollView {
+            VStack(spacing: 0) {
+               ForEach(AREAS) { (area) in
+                  areaRow(area)
+                  Divider()
+               }
+            }
+         }
+         .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
+      }
+   }
+
+   /**
+    * One area: its name, a swatch of its surface and text, the mode and, for a custom area, its values.
+    */
+   func areaRow(_ area: AreaInfo) -> some View {
+      let value = areas[area.key]
+      let isCustom = value.mode == Int(AREA_MODE_CUSTOM)
+      let theme = value.mode == Int(AREA_MODE_ORIGINAL) ? ThemeValues(surfaceMax: 1, gamma: 1, isStock: true)
+         : isCustom ? ThemeValues(surfaceMax: value.surfaceMax, gamma: value.gamma)
+         : ThemeValues(surfaceMax: surfaceMax, gamma: gamma)
+      let mode = Binding<Int>(
+         get: { return areas[area.key].mode },
+         set: { (newMode) in
+            var next = areas[area.key]
+
+            // A new custom area starts from the overall values.
+            if newMode == Int(AREA_MODE_CUSTOM) && next.mode != Int(AREA_MODE_CUSTOM) {
+               next.surfaceMax = surfaceMax
+               next.gamma = gamma
+            }
+            next.mode = newMode
+            areas[area.key] = next
+         }
+      )
+      let lightest = Binding<Double>(
+         get: { return areas[area.key].surfaceMax },
+         set: { (v) in areas[area.key].surfaceMax = v }
+      )
+      let curve = Binding<Double>(
+         get: { return areas[area.key].gamma },
+         set: { (v) in areas[area.key].gamma = v }
+      )
+
+      return VStack(alignment: .leading, spacing: 8) {
+         HStack(spacing: 10) {
+            Image(systemName: area.symbol).frame(width: 22).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+               Text(area.name)
+               Text(area.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer()
+            Text("Aa")
+               .font(.system(size: 11, weight: .semibold))
+               .foregroundStyle(theme.gray(STOCK_TEXT))
+               .frame(width: 36, height: 22)
+               .background(theme.gray(STOCK_ROW), in: RoundedRectangle(cornerRadius: 4))
+               .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.separator))
+            Picker(area.name, selection: mode) {
+               Text("Overall").tag(Int(AREA_MODE_OVERALL))
+               Text("Custom").tag(Int(AREA_MODE_CUSTOM))
+               Text("Original").tag(Int(AREA_MODE_ORIGINAL))
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 230)
+         }
+         if isCustom {
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
+               sliderRow("Lightness", value: lightest, range: SURFACE_RANGE, low: "Dark", high: "Light",
+                  shown: percent(value.surfaceMax), step: 0.01, defaultValue: surfaceMax)
+               sliderRow("Middle grays", value: curve, range: GAMMA_RANGE, low: "Light", high: "Dark",
+                  shown: String(format: "%.2f", value.gamma), step: 0.05, defaultValue: gamma)
+            }
+            .controlSize(.small)
+            .padding(.leading, 32)
+         }
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+   }
+
+   func presetRow(name: String, summary: String, surface: Double, hasAreas: Bool) -> some View {
       return HStack(spacing: 10) {
          RoundedRectangle(cornerRadius: 4)
             .fill(Color(white: surface))
@@ -488,10 +774,15 @@ struct ContentView: View {
             .frame(width: 18, height: 18)
          VStack(alignment: .leading, spacing: 1) {
             Text(name)
-            Text(summary).font(.caption).foregroundStyle(.secondary)
+            Text(summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+         }
+         if hasAreas {
+            Spacer()
+            Image(systemName: "square.grid.2x2").font(.caption).foregroundStyle(.secondary)
+               .help("This preset sets some areas on their own")
          }
       }
-      .padding(.vertical, 3)
+      .padding(.vertical, 2)
    }
 
    func sliderRow(_ label: String, value: Binding<Double>, range: ClosedRange<Double>, low: String,
@@ -518,7 +809,7 @@ struct ContentView: View {
             Button { nudge(step) } label: { Image(systemName: "plus") }
                .help("Fine step up")
             Button { value.wrappedValue = defaultValue } label: { Image(systemName: "arrow.uturn.backward") }
-               .help("Reset \(label) to its default")
+               .help("Reset \(label)")
                .disabled(abs(value.wrappedValue - defaultValue) < PRESET_MATCH)
          }
          .buttonStyle(.borderless)
