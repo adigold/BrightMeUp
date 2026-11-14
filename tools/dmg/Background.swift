@@ -1,10 +1,12 @@
 // Draws the background of the installer window: a night-to-sunrise sky, "Drag it in. Brighten up.",
 // and an arrow from the app to Applications. tools/dmg/build.sh renders it at 1x and 2x.
-// The window is 660 by 420 points; the icons sit at (137, 245) and (523, 245), see settings.py.
+// The layout is 660 by 420 points inside a 660 by 545 window; the icons sit at (137, 245) and (523, 245), see settings.py.
 import AppKit
 import SwiftUI
 
-let SIZE = CGSize(width: 660, height: 420)
+// Taller than the 420 point layout: when Finder shows its path and status bars they cover the
+// bottom, and when it hides them the extra sky fills the window.
+let SIZE = CGSize(width: 660, height: 545)
 let SUN = Color(red: 1, green: 0.66, blue: 0.16)
 
 struct Background: View {

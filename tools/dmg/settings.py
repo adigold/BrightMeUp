@@ -9,7 +9,8 @@ files = [app]
 symlinks = {"Applications": "/Applications"}
 icon = defines["icon"]
 background = defines["background"]
-window_rect = ((200, 140), (660, 420))
+# 545 points tall, so the whole picture shows even when Finder adds its path and status bars (Adi, 2026-11-14).
+window_rect = ((200, 120), (660, 545))
 default_view = "icon-view"
 show_status_bar = False
 show_tab_view = False

@@ -1,5 +1,5 @@
 # Runs the theme tests on every push. Releases are built, signed and notarized on a Mac, then
-# attached to a GitHub release as BrightMeUp.zip (see "Publish a release" in CLAUDE.md).
+# attached to a GitHub release as BrightMeUp.dmg and BrightMeUp.zip.
 name: Tests
 
 on:
