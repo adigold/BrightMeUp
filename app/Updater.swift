@@ -81,7 +81,8 @@ final class Updater: ObservableObject {
     * @param isManual Bool - true when the user chose Check for Updates
     */
    func check(isManual: Bool = false) async {
-      var request = URLRequest(url: RELEASES_API, timeoutInterval: 15)
+      // Always asks GitHub itself: a saved answer can still name the previous release (Adi, 2026-11-14).
+      var request = URLRequest(url: RELEASES_API, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
 
       if isManual {
          isDismissed = false
