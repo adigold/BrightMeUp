@@ -1,152 +1,126 @@
-# BrightMeUp
+<p align="center">
+  <img src="docs/icon.png" width="160" alt="BrightMeUp icon">
+</p>
+
+<h1 align="center">BrightMeUp</h1>
+
+<p align="center">
+  A bright look for Logic Pro.<br>
+  Turn the dark interface light, pick from 30 presets, and set each part of Logic Pro your way.
+</p>
+
+<p align="center">
+  <a href="https://github.com/adigold/BrightMeUp/releases/latest/download/BrightMeUp.zip"><img src="https://img.shields.io/badge/Download_for_Mac-FF8C28?style=for-the-badge&logo=apple&logoColor=white" height="48" alt="Download for Mac"></a><br>
+  For Logic Pro 13 on Macs with Apple silicon.
+</p>
+
+<p align="center">
+  Powered by <a href="https://inplug.app">InPlug.app</a>
+</p>
 
 <p align="center">
   <img src="docs/brightmeup.gif" width="960" alt="BrightMeUp turns Logic Pro from dark to bright, with presets and settings for each part of Logic Pro">
 </p>
 
-BrightMeUp is based on [I See Logic Pro](https://github.com/karlingen/i-see-logic-pro) by Karl Metum (MIT license).
+## Why you want it
 
-A customizable light theme for Logic Pro 13. Logic Pro has only a dark interface. This project changes its colors to light colors while Logic Pro runs.
+Logic Pro only comes in dark. That is great at night, but in a bright room or on a long day the dark screen can be hard on your eyes. BrightMeUp gives Logic Pro a light look, as bright or as soft as you like.
 
-The theme is a small library that Logic Pro loads at launch. It changes nothing in the Logic Pro app or on disk. If you start Logic Pro from the Dock, you get the normal dark interface. A small launcher app starts Logic Pro with the theme and lets you set the brightness.
-
-![Logic Pro with the Light preset of BrightMeUp](docs/light-theme.png)
-
-This project is a prototype. It is not from Apple, and Apple does not support it.
-
-## Requirements
-
-- Logic Pro 13.0 (build 7801). Other versions are not tested.
-- A Mac with Apple silicon. The library is built for arm64 only.
-- macOS 26. Other versions are not tested.
-
-## Install
-
-1. Open `BrightMeUp-1.0.0.zip`. Finder unpacks `BrightMeUp.app`.
-2. Move `BrightMeUp.app` to your Applications folder and open it.
-
-The app is signed with a Developer ID and notarized by Apple, so it opens with no warning.
-
-## Build from source
-
-You need the Xcode Command Line Tools. If you do not have them, run `xcode-select --install`.
-
-1. Clone this repository.
-2. Build the launcher app and the theme library:
-
-   ```sh
-   app/build.sh
-   ```
-
-   To sign and notarize for other Macs, set `SIGN_ID` to a Developer ID certificate:
-
-   ```sh
-   SIGN_ID="Developer ID Application: Adi Goldstein (4HJV6RPCLU)" VERSION=1.0.0 app/build.sh
-   ditto -c -k --keepParent app/BrightMeUp.app BrightMeUp.zip
-   xcrun notarytool submit BrightMeUp.zip --keychain-profile brightmeup-notary --wait
-   xcrun stapler staple app/BrightMeUp.app
-   ```
-
-3. Optional: move `app/BrightMeUp.app` to your Applications folder.
-
-The build writes `theme/light-theme.dylib` and copies it into `app/BrightMeUp.app`. It signs both for your Mac only. A Mac does not show a warning for an app that it built itself.
-
-## Use
-
-1. Quit Logic Pro.
-2. Open `BrightMeUp.app`.
-3. Select a preset in the sidebar, or move the sliders.
-4. Click Start Logic Pro.
-
-The app starts Logic Pro with the theme, and then it quits. The theme loads only at launch, so a change takes effect the next time that you start Logic Pro.
-
-The first launch with the theme takes about one second longer. The theme then reads the color names from your copy of Logic Pro and keeps them in a cache. The next launches use the cache.
-
-![The launcher app with the Soft preset](docs/launcher.png)
-
-The preview in the app shows some Logic Pro tracks with the current values. The app paints it with the same gray rule as the theme, so it is close to what Logic Pro shows. If Logic Pro is open or if Logic Pro changed after the build, the status line at the bottom tells you what to do.
-
-## Areas and presets
-
-The Areas tab splits Logic Pro into eight parts: the Tracks area, the Mixer, the Editors, the Control bar, the Inspector and Smart Controls, the Browsers and library, the Plug-in windows, and the shared Windows and panels. Each part can follow the overall values, use its own Lightness and Middle grays, or keep the original Logic Pro colors. Images and some fixed colors inside Logic Pro always follow the overall values.
-
-The sidebar has 30 presets in six groups (Bright, Balanced, Dim, High contrast, Low contrast, By area). Save as Preset (Command S) keeps your own, areas included. Reset to Default (Command 0) puts everything back to the Light preset.
-
-The preview shows the Main window (control bar, inspector and tracks), the Tracks area, the Mixer, the Piano Roll or a plug-in, each painted with the values of its area. When you change an area, the preview switches to it. The window resizes and goes full screen.
-
-## Change the brightness
-
-You decide how light the theme is. A white interface is good in a bright room, but many people find it too bright for long sessions. You can make all the surfaces darker and keep the text black, or select a point between the two.
-
-The theme changes every gray of Logic Pro with one rule. The darkest stock gray becomes the lightness value that you set. The lighter stock grays become darker grays, down to black for white text. Track colors and region colors do not change. Because one rule controls all the grays, two values control the whole interface.
+- **30 presets** in six groups: Bright, Balanced, Dim, High contrast, Low contrast and By area.
+- **Every part your way.** Set the Tracks area, Mixer, Editors, Control bar, Inspector, Browsers, Plug-in windows and shared panels on their own, or keep any of them in the original dark look.
+- **Live preview.** See the Main window, Tracks, Mixer, Piano Roll or a plug-in change while you move the sliders, and compare Before and After.
+- **Your own presets.** Save your favorite settings and switch in one click.
+- **Back to stock in one click.** Revert to Logic Defaults restarts Logic Pro in its original look. Your settings stay saved for next time.
+- **Nothing to undo.** BrightMeUp never changes Logic Pro or your projects. Open Logic Pro from the Dock and it looks exactly like it always did.
 
 | Stock Logic Pro | Light |
 | --- | --- |
-| ![Logic Pro without the theme](docs/compare-stock.png) | ![Logic Pro with the Light preset](docs/compare-light.png) |
-| Soft | Gray |
+| ![Logic Pro without BrightMeUp](docs/compare-stock.png) | ![Logic Pro with the Light preset](docs/compare-light.png) |
+| **Soft** | **Gray** |
 | ![Logic Pro with the Soft preset](docs/compare-soft.png) | ![Logic Pro with the Gray preset](docs/compare-gray.png) |
 
-The app has these controls:
+## Download and install
 
-| Control | Range | Effect |
-| --- | --- | --- |
-| Lightness | 0.65 to 1 | The lightest gray. A lower value gives a darker interface. |
-| Middle grays | 0.5 to 1.5 | The curve between dark and light grays. A higher value makes the middle grays darker. |
+**[Download BrightMeUp for Mac](https://github.com/adigold/BrightMeUp/releases/latest/download/BrightMeUp.zip)**
 
-The presets are Light (1 and 0.75), Soft (0.85 and 0.85) and Gray (0.68 and 1). If you move a slider, the app selects Custom and keeps your values. The app stores them, and the theme uses them each time that you start Logic Pro with the app or with `launch.sh`.
+1. Click the link above. Your browser downloads `BrightMeUp.zip`.
+2. Double-click the zip to unzip it.
+3. Drag `BrightMeUp` into your Applications folder.
+4. Open BrightMeUp.
 
-Values below 0.65 are not allowed, because black text then becomes hard to read. At 0.65, black text on the lightest gray has a contrast of about 5.6:1.
+BrightMeUp is signed and notarized by Apple, so it opens with no warning.
 
-## Use from a terminal
+All versions are on the [Releases page](https://github.com/adigold/BrightMeUp/releases).
 
-You can also start Logic Pro with the theme from a terminal:
+### Requirements
 
-```sh
-theme/launch.sh
-```
+- Logic Pro 13.0
+- A Mac with Apple silicon
+- macOS 26
 
-To open projects at the same time, add their paths:
+## How to use it
 
-```sh
-theme/launch.sh ~/Music/Logic/MySong.logicx
-```
+![The BrightMeUp app](docs/app.png)
 
-If Logic Pro is open, `launch.sh` stops and tells you to quit Logic Pro first. `launch.sh` uses the settings of the app. Two environment variables override them for one launch:
+1. Open BrightMeUp.
+2. Pick a preset in the sidebar, or move the Lightness and Middle grays sliders.
+3. Want one part different? Open the **Areas** tab and set that part to Custom or Original.
+4. Click **Start Logic Pro**. If Logic Pro is already open, click **Restart Logic Pro**. Logic Pro asks you to save first.
 
-```sh
-LP_SURFACE_MAX=0.85 LP_GAMMA=0.85 theme/launch.sh
-```
+Your look is added when Logic Pro starts, so a change shows the next time Logic Pro opens.
 
-`LP_SURFACE_MAX` is the lightness, and `LP_GAMMA` is the middle grays value. To change the stored settings without the app, use `defaults`:
+### The two sliders
 
-```sh
-defaults write io.github.karlingen.i-see-logic-pro surfaceMax -float 0.85
-```
+| Slider | What it does |
+| --- | --- |
+| Lightness | How light the backgrounds are. 100% is white, lower is a softer gray. |
+| Middle grays | How dark the buttons, lines and controls are against the background. Higher gives more contrast. |
+
+Track and region colors always keep their own colors.
+
+### Handy shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| Command S | Save the current look as a preset |
+| Command 0 | Reset to Default (the Light preset) |
+
+## Go back to the original look
+
+Click **Revert to Logic Defaults** at the top right of BrightMeUp. It asks you to confirm, then restarts Logic Pro in its original dark look. Your BrightMeUp settings stay saved, so you can come back any time with Start Logic Pro.
+
+You can also simply open Logic Pro from the Dock. It always opens in its original look.
 
 ## After a Logic Pro update
 
-The theme reads the color names of the new Logic Pro version at the first launch. You do not have to do anything for the colors.
-
-An update can also change the internal functions that the theme uses. Each version of the app was tested with one build of Logic Pro. If your build is different, the status line of the app tells you, and some parts of the interface can stay dark. Look for a newer version on the Releases page. If there is none, open an issue with your Logic Pro version.
+Each version of BrightMeUp is tested with one version of Logic Pro. If you have a different version, BrightMeUp tells you, and a few parts of Logic Pro may stay dark. Check the [Releases page](https://github.com/adigold/BrightMeUp/releases) for a newer version.
 
 ## Remove
 
-1. Delete `BrightMeUp.app`. If you built it from source, delete the repository folder too.
-2. Delete the stored settings and the color cache:
+1. Delete `BrightMeUp` from your Applications folder.
+2. Optional: delete the saved settings. Run this in Terminal:
 
    ```sh
-   defaults delete io.github.karlingen.i-see-logic-pro
-   rm -r ~/Library/Caches/io.github.karlingen.i-see-logic-pro
+   defaults delete com.adigoldstein.brightmeup
+   rm -r ~/Library/Caches/com.adigoldstein.brightmeup
    ```
 
-3. Start Logic Pro from the Dock as usual.
+## Build from source
 
-## Known limits
+You need Xcode.
 
-- Some text and controls stay dark or have low contrast. Examples are the automation inspector and the active Mute button in the Mixer.
-- The theme depends on internal parts of Logic Pro. An update can make parts of the interface dark again.
-- Logic Pro loads the library because Logic Pro 13 allows `DYLD_INSERT_LIBRARIES`. If a future version blocks it, the theme stops working.
+```sh
+git clone https://github.com/adigold/BrightMeUp.git
+cd BrightMeUp
+app/build.sh
+```
 
-## How it works
+The app appears at `app/BrightMeUp.app`. To sign it for other Macs, set `SIGN_ID` to your own Developer ID certificate before you build.
 
-At launch, `theme/light-theme.m` replaces some AppKit and CoreUI methods. It maps the dark grays of Logic Pro to light grays and keeps saturated colors such as track colors. It also recolors some images and keeps glyphs white on colored buttons. `CLAUDE.md` describes the parts in more detail.
+## Credits
+
+BrightMeUp is based on [I See Logic Pro](https://github.com/karlingen/i-see-logic-pro) by Karl Metum, under the MIT license. See [LICENSE](LICENSE).
+
+BrightMeUp is not made by Apple, and Apple does not support it. Logic Pro is a trademark of Apple Inc.
+
+© 2026 InPlug/AGsoundtrax LLC, All rights reserved.

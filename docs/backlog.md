@@ -16,9 +16,12 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
 
 ## Done
+
+- [x] **BL-10** `P1 · High` **Clean the README and push to GitHub:** rewrite the README to describe results only (no internals), replace the old launcher screenshot, then push to github.com/adigold/BrightMeUp. Adi asked 2026-11-14. README rewritten like CST-Convertor (Download for Mac button to releases/latest/download/BrightMeUp.zip), release v1.2.3 published. · done 2026-11-14
 
 - [x] **BL-9** `P2 · Medium` **Animated GIF for the README:** an eye-catching animated GIF at the top of the GitHub README showing BrightMeUp turning Logic Pro light, the previews and presets. Adi asked 2026-11-14. docs/brightmeup.gif (13 s loop, 5.2 MB), rebuilt with tools/readme-gif/build.sh. · done 2026-11-14
 

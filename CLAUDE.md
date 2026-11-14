@@ -27,7 +27,7 @@ LP_SURFACE_MAX=0.85 theme/launch.sh # Sets the lightest gray (0.65 to 1)
 
 The build does not need Logic Pro. Git ignores `*.dylib` and `*.app`. Do not commit data from the Logic Pro bundle, such as color names or images.
 
-To publish a release, push a version tag, for example `git tag v1.0.0 && git push origin v1.0.0`. The workflow `.github/workflows/release.yml` builds the app on a GitHub Mac runner and attaches a zip file to a new release. The app is ad-hoc signed and not notarized, so the README tells users how to open it the first time. When you test a new Logic Pro build, change `tested_logic_build` in `app/build.sh`.
+To publish a release, build with `SIGN_ID="Developer ID Application: Adi Goldstein (4HJV6RPCLU)" VERSION=x.y.z app/build.sh`, notarize the zip with `xcrun notarytool submit ... --keychain-profile brightmeup-notary --wait`, staple the app, zip it again as `BrightMeUp.zip`, and attach it with `gh release create vX.Y.Z BrightMeUp.zip`. The README download button points to `releases/latest/download/BrightMeUp.zip`, so the asset name must stay `BrightMeUp.zip`. `.github/workflows/tests.yml` only runs the tests. When you test a new Logic Pro build, change `tested_logic_build` in `app/build.sh`.
 
 `tests/run.sh` builds and runs `tests/theme-tests.m`. These tests include the theme source and test the gray rule, the setting limits, the text field rule and the color list parser. Run them after each change to these parts. The release workflow runs them before the build. The tests do not need Logic Pro, because `start()` installs the hooks only inside Logic Pro.
 
