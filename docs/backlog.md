@@ -24,6 +24,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 ## Done
 
+- [x] **BL-14** `P1 · Critical` **1.2.4 crashed Logic Pro at launch:** the new plug-in check asked AppKit for the drawing appearance during launch, AppKit called back into the appearance hook and stopped. Fixed in 1.2.5 (no check before the first plug-in window, no re-entry), tested with a real Logic Pro launch, 1.2.4 and 1.2.3 releases hidden. Adi reported 2026-11-14. · done 2026-11-14
+
 - [x] **BL-13** `P1 · Critical` **Never touch plug-ins:** the theme also changed plug-in windows (built-in and third-party). Only the Logic Pro interface may change; every plug-in window must keep its own look. Adi reported 2026-11-14. Fixed in 1.2.4: plug-in windows keep the real dark look and every color/image hook skips them; plug-in area removed from the app. GitHub release v1.2.3 set to draft so the buggy build cannot be downloaded. Published as v1.2.4 on Adi's "push". · done 2026-11-14
 
 - [x] **BL-12** `P3 · Low` **Remove the Credits line from the README:** Adi asked 2026-11-14. The LICENSE file keeps the original copyright notice, which the MIT license requires. · done 2026-11-14

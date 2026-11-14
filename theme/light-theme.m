@@ -356,13 +356,25 @@ static BOOL isPluginWindow(NSWindow *window) {
  *
  * @return BOOL - true while a plug-in window draws
  */
-static BOOL isPluginDrawing(void) {
-   if (@available(macOS 11.0, *)) {
-      NSAppearance *current = NSAppearance.currentDrawingAppearance;
+// Set when the first plug-in window opens. Until then no plug-in can draw, and the check below
+// must not run: early in the launch, asking AppKit for the drawing appearance starts its appearance
+// setup, which calls +appearanceNamed: back into the theme and stops Logic Pro (2026-11-14 crash).
+static volatile BOOL hasPluginWindow = NO;
+// Guards against the same kind of loop on one thread at any later time.
+static __thread BOOL isCheckingPlugin = NO;
 
-      return current == trueDarkAqua || [current.name isEqualToString:NSAppearanceNameDarkAqua];
+static BOOL isPluginDrawing(void) {
+   NSAppearance *current;
+   BOOL result;
+
+   if (!hasPluginWindow || isCheckingPlugin) {
+      return NO;
    }
-   return NO;
+   isCheckingPlugin = YES;
+   current = NSAppearance.currentDrawingAppearance;
+   result = current == trueDarkAqua || [current.name isEqualToString:NSAppearanceNameDarkAqua];
+   isCheckingPlugin = NO;
+   return result;
 }
 
 static CGColorRef realCGColor(id named) {
@@ -407,9 +419,7 @@ static CGColorRef hookCGColor(id named, SEL sel) {
 static NSAppearance *hookAppearanceNamed(id cls, SEL sel, NSAppearanceName name) {
    NSAppearanceName mapped = name;
 
-   if (isPluginDrawing()) {
-      mapped = name;
-   } else if ([name isEqualToString:NSAppearanceNameDarkAqua]) {
+   if ([name isEqualToString:NSAppearanceNameDarkAqua]) {
       mapped = NSAppearanceNameAqua;
    } else if ([name isEqualToString:NSAppearanceNameVibrantDark]) {
       mapped = NSAppearanceNameVibrantLight;
@@ -1209,6 +1219,7 @@ static void hookButtonImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect 
 static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode place, NSInteger other) {
    // A plug-in window keeps the real dark appearance, so it and the plug-in inside look stock.
    if (place != NSWindowOut && isPluginWindow(window)) {
+      hasPluginWindow = YES;
       if (window.appearance != trueDarkAqua) {
          window.appearance = trueDarkAqua;
       }
