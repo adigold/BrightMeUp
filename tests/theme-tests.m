@@ -81,6 +81,27 @@ static void testAreas(void) {
    CGColorRelease(color);
 }
 
+static BOOL realtimeResult = NO;
+
+static void *realtimeThread(void *unused) {
+   thread_time_constraint_policy_data_t policy = { 1000000, 200000, 400000, 1 };
+
+   thread_policy_set(pthread_mach_thread_np(pthread_self()), THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy, THREAD_TIME_CONSTRAINT_POLICY_COUNT);
+   realtimeResult = isRealtimeThread() && shouldSkip();
+   return NULL;
+}
+
+static void testSafety(void) {
+   pthread_t thread;
+
+   check(missingPart() != nil, "outside Logic Pro the self-check finds parts missing, so nothing is installed");
+   check(!isRealtimeThread(), "the main thread is not an audio thread");
+   check(!shouldSkip(), "the main thread outside a plug-in window is themed");
+   pthread_create(&thread, NULL, realtimeThread, NULL);
+   pthread_join(thread, NULL);
+   check(realtimeResult, "a real-time (audio) thread is always skipped");
+}
+
 static void testFieldColors(void) {
    NSColor *dark = [NSColor colorWithSRGBRed:0.2 green:0.2 blue:0.2 alpha:1];
    NSColor *light = [NSColor colorWithSRGBRed:0.9 green:0.9 blue:0.9 alpha:1];
@@ -117,6 +138,7 @@ int main(void) {
       testSettings();
       testFieldColors();
       testAreas();
+      testSafety();
       testColorList();
    }
    printf(failures ? "%d tests failed\n" : "All tests passed\n", failures);

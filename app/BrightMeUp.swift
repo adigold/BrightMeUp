@@ -255,6 +255,7 @@ struct ThemeValues {
 enum LaunchStatus {
    case ready, logicRunning, waitingForQuit, waitingForRevert, logicMissing, libraryMissing, failed(String)
    case logicUntested(tested: String, installed: String)
+   case themeTurnedOff
 
    var text: String {
       switch self {
@@ -270,12 +271,15 @@ enum LaunchStatus {
       case .logicUntested(let tested, let installed):
          return "Ready. This version was made for Logic Pro build \(tested) and you have build \(installed). Most of the look works, a few parts may stay dark."
       case .failed(let error): return "Logic Pro did not open. \(error)"
+      case .themeTurnedOff:
+         return "To keep Logic Pro safe, BrightMeUp turned itself off at the last start: something it needs changed in this Logic Pro or macOS version. Logic Pro opened in its original look. Look for a BrightMeUp update."
       }
    }
 
    var symbol: String {
       switch self {
       case .ready: return "checkmark.circle.fill"
+      case .themeTurnedOff: return "shield.lefthalf.filled"
       case .logicRunning, .waitingForQuit, .waitingForRevert: return "arrow.clockwise.circle.fill"
       case .failed: return "xmark.octagon.fill"
       default: return "exclamationmark.triangle.fill"
@@ -307,7 +311,7 @@ enum LaunchStatus {
 
    var canStart: Bool {
       switch self {
-      case .ready, .logicUntested, .failed, .logicRunning: return true
+      case .ready, .logicUntested, .failed, .logicRunning, .themeTurnedOff: return true
       default: return false
       }
    }
@@ -339,6 +343,11 @@ func getLaunchStatus() -> LaunchStatus {
    }
    if isLogicRunning() {
       return .logicRunning
+   }
+   // The theme records its launch self-check. If it turned itself off for this Logic Pro build, say so.
+   if let check = UserDefaults.standard.string(forKey: "themeCheck"), check.hasPrefix("off"),
+      UserDefaults.standard.string(forKey: "themeCheckBuild") == installed {
+      return .themeTurnedOff
    }
    if let tested, tested != installed {
       return .logicUntested(tested: tested, installed: installed)

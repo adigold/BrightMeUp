@@ -19,10 +19,19 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
+
+- [~] **BL-18** `P1 · High` **Null test:** prove the audio is identical with and without BrightMeUp by comparing two bounces sample by sample. Adi asked 2026-11-14. tools/null-test.sh written and self-tested; needs two bounces of the same project (stock and BrightMeUp).
+
+- [~] **BL-17** `P1 · High` **Release gate:** a script that launches Logic Pro with the theme on a test project, checks plug-in windows, playback and crash reports, and must pass before any release. Adi asked 2026-11-14. tools/release-check.sh written; needs the test project (Manzana copy saved with plug-in windows open) and a run with Logic Pro closed.
 
 
 ## Done
+
+- [x] **BL-16** `P1 · High` **Safety: never act on audio threads:** every hook does nothing on real-time (audio) threads, and test mode counts any such call. Adi asked 2026-11-14. Done in 1.2.6: isRealtimeThread() in every hook, unit tested with a real-time thread. · done 2026-11-14
+
+- [x] **BL-15** `P1 · High` **Safety: turn off on anything unexpected:** at launch the theme checks every class and method it relies on (plug-in windows included); if anything is missing it installs nothing and Logic Pro runs stock, and the app says why. Adi asked 2026-11-14. Done in 1.2.6: missingPart() check, app shows when the theme turned itself off. Also fixed: plug-in protection was off at 100% Lightness. · done 2026-11-14
 
 - [x] **BL-14** `P1 · Critical` **1.2.4 crashed Logic Pro at launch:** the new plug-in check asked AppKit for the drawing appearance during launch, AppKit called back into the appearance hook and stopped. Fixed in 1.2.5 (no check before the first plug-in window, no re-entry), tested with a real Logic Pro launch, 1.2.4 and 1.2.3 releases hidden. Adi reported 2026-11-14. · done 2026-11-14
 

@@ -3,6 +3,9 @@
 // The environment variables LP_SURFACE_MAX and LP_GAMMA override them.
 // LP_OUT and LP_DELAY enable the render test.
 #import <AppKit/AppKit.h>
+#import <mach/mach.h>
+#import <mach/thread_policy.h>
+#import <pthread.h>
 #import <dlfcn.h>
 #import <execinfo.h>
 #import <mach-o/dyld.h>
@@ -363,6 +366,36 @@ static volatile BOOL hasPluginWindow = NO;
 // Guards against the same kind of loop on one thread at any later time.
 static __thread BOOL isCheckingPlugin = NO;
 
+// Audio runs on real-time threads. The theme must never act there, so every hook checks the
+// thread first (Adi, 2026-11-14). The answer is kept per thread, so the check costs one system
+// call per thread. Test mode reports how many calls were skipped this way.
+static __thread int threadKind = 0;
+static volatile long realtimeSkips = 0;
+
+static BOOL isRealtimeThread(void) {
+   if (threadKind == 0) {
+      thread_time_constraint_policy_data_t policy;
+      mach_msg_type_number_t count = THREAD_TIME_CONSTRAINT_POLICY_COUNT;
+      // FALSE asks for the policy of this thread; TRUE would return the default policy.
+      boolean_t isDefault = FALSE;
+      kern_return_t result = thread_policy_get(pthread_mach_thread_np(pthread_self()), THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy, &count, &isDefault);
+
+      threadKind = result == KERN_SUCCESS && !isDefault ? 2 : 1;
+   }
+   if (threadKind == 2) {
+      realtimeSkips += 1;
+      return YES;
+   }
+   return NO;
+}
+
+static BOOL isPluginDrawing(void);
+
+// True when a hook must leave everything as it is: on an audio thread, or inside a plug-in window.
+static BOOL shouldSkip(void) {
+   return isRealtimeThread() || isPluginDrawing();
+}
+
 static BOOL isPluginDrawing(void) {
    NSAppearance *current;
    BOOL result;
@@ -393,7 +426,7 @@ static CGColorRef hookCGColor(id named, SEL sel) {
    id tag;
    CGColorRef mapped;
 
-   if (isPluginDrawing()) {
+   if (shouldSkip()) {
       return realCGColor(named);
    }
    tag = objc_getAssociatedObject(named, &mappedKey);
@@ -433,13 +466,13 @@ static void hookAppSetAppearance(id app, SEL sel, NSAppearance *appearance) {
 
 #define WHITE_HOOK(fn, orig) \
    static NSColor *fn(id cls, SEL sel, CGFloat white, CGFloat alpha) { \
-      CGFloat mapped = isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing() ? mapGray(white, alpha) : white; \
+      CGFloat mapped = isLogicCaller(__builtin_return_address(0)) && !shouldSkip() ? mapGray(white, alpha) : white; \
       return ((NSColor *(*)(id, SEL, CGFloat, CGFloat))orig)(cls, sel, mapped, alpha); \
    }
 
 #define RGB_HOOK(fn, orig) \
    static NSColor *fn(id cls, SEL sel, CGFloat r, CGFloat g, CGFloat b, CGFloat a) { \
-      if (isPluginDrawing()) { \
+      if (shouldSkip()) { \
       } else if (isLogicCaller(__builtin_return_address(0)) && isGrayish(r, g, b)) { \
          r = g = b = mapGray((r + g + b) / 3, a); \
       } else if (isLogicCaller(__builtin_return_address(0)) && isDarkenedLiteral(r, g, b)) { \
@@ -452,7 +485,7 @@ static void hookAppSetAppearance(id app, SEL sel, NSAppearance *appearance) {
 
 #define NAMED_HOOK(fn, orig, white) \
    static NSColor *fn(id cls, SEL sel) { \
-      if (isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing()) { \
+      if (isLogicCaller(__builtin_return_address(0)) && !shouldSkip()) { \
          return ((NSColor *(*)(id, SEL, CGFloat, CGFloat))origGenWhite)(cls, @selector(colorWithGenericGamma22White:alpha:), mapGray(white, 1), 1); \
       } \
       return ((NSColor *(*)(id, SEL))orig)(cls, sel); \
@@ -475,14 +508,14 @@ NAMED_HOOK(hookGray, origGray, 0.5)
 static IMP origSecondaryLabel, origTertiaryLabel;
 
 static NSColor *hookSecondaryLabel(id cls, SEL sel) {
-   if (isPluginDrawing()) {
+   if (shouldSkip()) {
       return ((NSColor *(*)(id, SEL))origSecondaryLabel)(cls, sel);
    }
    return [NSColor colorWithSRGBRed:0 green:0 blue:0 alpha:SECONDARY_LABEL_ALPHA];
 }
 
 static NSColor *hookTertiaryLabel(id cls, SEL sel) {
-   if (isPluginDrawing()) {
+   if (shouldSkip()) {
       return ((NSColor *(*)(id, SEL))origTertiaryLabel)(cls, sel);
    }
    return [NSColor colorWithSRGBRed:0 green:0 blue:0 alpha:TERTIARY_LABEL_ALPHA];
@@ -843,7 +876,7 @@ static BOOL hookRepDraw(NSImageRep *rep, SEL sel, NSRect rect, NSRect from, NSCo
    NSImageRep *shown = rep;
    BOOL isSmall = rep.size.width <= DRAW_IMAGE_MAX && rep.size.height <= DRAW_IMAGE_MAX;
 
-   if (isPluginDrawing()) {
+   if (shouldSkip()) {
       return ((RepDraw)origRepDraw)(rep, sel, rect, from, op, fraction, flipped, hints);
    }
    if (isLogicCaller(__builtin_return_address(0)) && isSmall) {
@@ -863,7 +896,7 @@ static BOOL hookRepDraw(NSImageRep *rep, SEL sel, NSRect rect, NSRect from, NSCo
 }
 
 static void hookImageDraw(NSImage *image, SEL sel, NSRect rect, NSRect from, NSCompositingOperation op, CGFloat fraction, BOOL flipped, NSDictionary *hints) {
-   NSImage *shown = isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing() ? drawableImage(image) : image;
+   NSImage *shown = isLogicCaller(__builtin_return_address(0)) && !shouldSkip() ? drawableImage(image) : image;
 
    ((ImageDraw)origImageDraw)(shown, sel, rect, from, op, fraction, flipped, hints);
 }
@@ -878,13 +911,13 @@ static void hookImageDraw(NSImage *image, SEL sel, NSRect rect, NSRect from, NSC
  */
 static NSImageRep *hookBestRep(NSImage *image, SEL sel, NSRect rect, NSGraphicsContext *context, NSDictionary *hints) {
    uintptr_t caller = (uintptr_t)__builtin_return_address(0) & ADDRESS_MASK;
-   NSImage *shown = caller >= threePartDraw.start && caller < threePartDraw.end && !isPluginDrawing() ? drawableImage(image) : image;
+   NSImage *shown = caller >= threePartDraw.start && caller < threePartDraw.end && !shouldSkip() ? drawableImage(image) : image;
 
    return ((NSImageRep *(*)(id, SEL, NSRect, id, id))origBestRep)(shown, sel, rect, context, hints);
 }
 
 static void interposeThreePart(NSRect frame, NSImage *start, NSImage *center, NSImage *end, BOOL vertical, NSCompositingOperation op, CGFloat fraction, BOOL flipped) {
-   if (isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing()) {
+   if (isLogicCaller(__builtin_return_address(0)) && !shouldSkip()) {
       start = drawableImage(start);
       center = drawableImage(center);
       end = drawableImage(end);
@@ -906,7 +939,7 @@ static void interposeDrawPath(CGContextRef ctx, CGPathDrawingMode mode) {
    CGColorRef fill = NULL;
    size_t count = 0;
 
-   if (isLogicCaller(__builtin_return_address(0)) && !isPluginDrawing()) {
+   if (isLogicCaller(__builtin_return_address(0)) && !shouldSkip()) {
       caller = (uintptr_t)__builtin_return_address(2) & ADDRESS_MASK;
    }
    if (caller >= regionDrawStart && caller < regionDrawEnd && fillColorOf) {
@@ -936,7 +969,7 @@ static void interposeDrawPath(CGContextRef ctx, CGPathDrawingMode mode) {
  * @param color CGColorRef - the fill color
  */
 static void interposeFillColor(CGContextRef ctx, CGColorRef color) {
-   const CGFloat *c = isOnBevel && color && !isPluginDrawing() ? CGColorGetComponents(color) : NULL;
+   const CGFloat *c = isOnBevel && color && !shouldSkip() ? CGColorGetComponents(color) : NULL;
    size_t count = c ? CGColorGetNumberOfComponents(color) : 0;
 
    if (count >= 2 && fmax(c[0], c[count > 2 ? count - 2 : 0]) < BLACK_MAX) {
@@ -964,7 +997,7 @@ static void interposeLineDraw(CTLineRef line, CGContextRef ctx) {
    CGColorRef text = NULL, rgb = NULL;
    const CGFloat *c = NULL;
 
-   if (caller >= textDraw.start && caller < textDraw.end && !isPluginDrawing() && isCalledFrom(rulerMarkerDraw, (ImageRange){ 0, 0 })) {
+   if (caller >= textDraw.start && caller < textDraw.end && !shouldSkip() && isCalledFrom(rulerMarkerDraw, (ImageRange){ 0, 0 })) {
       runs = CTLineGetGlyphRuns(line);
    }
    if (runs && CFArrayGetCount(runs) > 0) {
@@ -1006,14 +1039,14 @@ __attribute__((used, section("__DATA,__interpose"))) static struct { const void 
 };
 
 static id hookCompositeImage(id manager, SEL sel, id description, id context) {
-   if (isPluginDrawing()) {
+   if (shouldSkip()) {
       return ((id (*)(id, SEL, id, id))origCompositeImage)(manager, sel, description, context);
    }
    return recoloredAsset(((id (*)(id, SEL, id, id))origCompositeImage)(manager, sel, description, context), assetStyle(description));
 }
 
 static id hookCatalogImage(id manager, SEL sel, id description, id context) {
-   if (isPluginDrawing()) {
+   if (shouldSkip()) {
       return ((id (*)(id, SEL, id, id))origCatalogImage)(manager, sel, description, context);
    }
    return recoloredAsset(((id (*)(id, SEL, id, id))origCatalogImage)(manager, sel, description, context), assetStyle(description));
@@ -1130,7 +1163,7 @@ static id hookNibDecode(NSCoder *decoder, SEL sel, NSString *key) {
    // A nib does not know its window yet, so the color decides when it draws: a plug-in window
    // gets the color from the nib, every other window gets the mapped color.
    return [NSColor colorWithName:nil dynamicProvider:^NSColor *(NSAppearance *appearance) {
-      return isPluginDrawing() ? (NSColor *)decoded : mapped;
+      return shouldSkip() ? (NSColor *)decoded : mapped;
    }];
 }
 
@@ -1143,7 +1176,7 @@ static id hookNibDecode(NSCoder *decoder, SEL sel, NSString *key) {
  * @param color NSColor * - the new background color
  */
 static void hookFieldBackground(NSTextField *field, SEL sel, NSColor *color) {
-   NSColor *mapped = isLogicCaller(__builtin_return_address(0)) && !isPluginWindow(field.window) && !isPluginDrawing() ? mappedGrayColor(color, FIELD_DARK_MAX) : color;
+   NSColor *mapped = isLogicCaller(__builtin_return_address(0)) && !isPluginWindow(field.window) && !shouldSkip() ? mappedGrayColor(color, FIELD_DARK_MAX) : color;
 
    ((void (*)(id, SEL, NSColor *))origFieldBackground)(field, sel, mapped);
 }
@@ -1200,7 +1233,7 @@ static BOOL isColored(NSColor *color) {
 // Glyphs are tinted with label colors, which are black here. Active colored buttons keep their
 // fill, so their glyphs must stay white. Neutral fills stay light, and need a dark glyph.
 static void hookToolbarImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect frame, NSView *view) {
-   BOOL isActive = !isPluginDrawing() && cell.state == NSControlStateValueOn && isColored(object_getIvar(cell, toolbarOnColor));
+   BOOL isActive = !shouldSkip() && cell.state == NSControlStateValueOn && isColored(object_getIvar(cell, toolbarOnColor));
 
    ((void (*)(id, SEL, NSImage *, NSRect, NSView *))origToolbarImage)(cell, sel, isActive ? whiteGlyph(image) : image, frame, view);
 }
@@ -1223,7 +1256,7 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
       if (window.appearance != trueDarkAqua) {
          window.appearance = trueDarkAqua;
       }
-   } else if (place != NSWindowOut && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
+   } else if (surfaceMax < 1 && place != NSWindowOut && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
       window.titlebarAppearsTransparent = YES;
       if ([window.backgroundColor isEqual:NSColor.windowBackgroundColor]) {
          window.backgroundColor = [NSColor colorNamed:@"BackgroundViewControlbar"];
@@ -1237,7 +1270,7 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
 static NSColor *hookClipBackground(NSClipView *view, SEL sel) {
    NSColor *color = ((NSColor *(*)(id, SEL))origClipBackground)(view, sel);
 
-   if (isPluginDrawing() || isPluginWindow(view.window)) {
+   if (shouldSkip() || isPluginWindow(view.window)) {
       return color;
    }
    return [color isEqual:NSColor.controlBackgroundColor] ? scaledControlBackground : color;
@@ -1267,9 +1300,21 @@ static IMP swapClassMethod(Class cls, SEL sel, IMP hook) {
 static void renderTest(void) {
    int delay = getenv("LP_DELAY") ? atoi(getenv("LP_DELAY")) : 30;
 
+   // LP_PLAY starts playback halfway, so the audio threads run while the theme is active.
+   if (getenv("LP_PLAY")) {
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)delay * NSEC_PER_SEC / 2), dispatch_get_main_queue(), ^{
+         NSWindow *target = NSApp.keyWindow ?: NSApp.mainWindow;
+         NSEvent *down = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint modifierFlags:0 timestamp:0 windowNumber:target.windowNumber context:nil characters:@" " charactersIgnoringModifiers:@" " isARepeat:NO keyCode:49];
+         NSEvent *up = [NSEvent keyEventWithType:NSEventTypeKeyUp location:NSZeroPoint modifierFlags:0 timestamp:0 windowNumber:target.windowNumber context:nil characters:@" " charactersIgnoringModifiers:@" " isARepeat:NO keyCode:49];
+
+         [NSApp sendEvent:down];
+         [NSApp sendEvent:up];
+      });
+   }
+
    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)delay * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
       int index = 0;
-      NSMutableString *log = [NSMutableString stringWithFormat:@"app=%@ effective=%@ recolored=%d\n", NSApp.appearance.name, NSApp.effectiveAppearance.name, recoloredImages];
+      NSMutableString *log = [NSMutableString stringWithFormat:@"check=ok\napp=%@ effective=%@ recolored=%d\nrealtimeSkips=%ld\n", NSApp.appearance.name, NSApp.effectiveAppearance.name, recoloredImages, realtimeSkips];
 
       for (NSWindow *w in NSApp.windows) {
          NSView *root = w.contentView.superview ?: w.contentView;
@@ -1278,7 +1323,7 @@ static void renderTest(void) {
          if (rep) {
             [root cacheDisplayInRect:root.bounds toBitmapImageRep:rep];
             [[rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}] writeToFile:[outDir stringByAppendingFormat:@"/window-%d.png", index] atomically:YES];
-            [log appendFormat:@"%@ '%@' effective=%@\n", w.class, w.title, w.effectiveAppearance.name];
+            [log appendFormat:@"%@ '%@' effective=%@ plugin=%@\n", w.class, w.title, w.effectiveAppearance.name, isPluginWindow(w) ? @"yes" : @"no"];
             index += 1;
          }
       }
@@ -1307,6 +1352,57 @@ static double readSetting(const char *envName, NSString *key, double fallback, d
       value = [stored doubleValue];
    }
    return fmin(high, fmax(low, value));
+}
+
+/**
+ * Checks that every class and method the theme relies on is there. A Logic Pro or macOS update
+ * can remove one; then the theme installs nothing and Logic Pro runs in its stock look, rather
+ * than half themed or unsafe. The result goes to the preferences, so the app can say why.
+ *
+ * @return NSString * - nil when all is there, or the first missing part
+ */
+static NSString *missingPart(void) {
+   NSArray<NSString *> *classes = @[ @"CUINamedColor", @"MAAssetManager", @"UINibDecoder", @"CTooltipView",
+      @"MAPluginWindow", @"CLgPluginWindow", @"LgPluginWindowController" ];
+   NSArray<NSArray<NSString *> *> *methods = @[
+      @[ @"CUINamedColor", @"cgColor" ],
+      @[ @"MAAssetManager", @"CompositeImageFromDescription:withContext:" ],
+      @[ @"MAAssetManager", @"UICatalogFromDescription:withContext:" ],
+      @[ @"UINibDecoder", @"decodeObjectForKey:" ],
+      @[ @"CTooltipView", @"labelAttributes" ],
+      @[ @"CTooltipView", @"valueAttributes" ],
+      @[ @"CTooltipView", @"rightAlignedValueAttributes" ],
+      @[ @"NSWindow", @"orderWindow:relativeTo:" ],
+      @[ @"NSImage", @"drawInRect:fromRect:operation:fraction:respectFlipped:hints:" ],
+      @[ @"NSImageRep", @"drawInRect:fromRect:operation:fraction:respectFlipped:hints:" ],
+      @[ @"NSImage", @"bestRepresentationForRect:context:hints:" ],
+      @[ @"NSTextField", @"setBackgroundColor:" ],
+      @[ @"NSAppearance", @"initWithCoder:" ],
+      @[ @"NSTableHeaderView", @"drawRect:" ],
+      @[ @"NSButtonCell", @"drawImage:withFrame:inView:" ],
+   ];
+
+   for (NSString *name in classes) {
+      if (!objc_getClass(name.UTF8String)) {
+         return name;
+      }
+   }
+   for (NSArray<NSString *> *pair in methods) {
+      if (!class_getInstanceMethod(objc_getClass(pair[0].UTF8String), NSSelectorFromString(pair[1]))) {
+         return [NSString stringWithFormat:@"%@ %@", pair[0], pair[1]];
+      }
+   }
+   if (![NSAppearance respondsToSelector:@selector(currentDrawingAppearance)]) {
+      return @"NSAppearance currentDrawingAppearance";
+   }
+   return nil;
+}
+
+static void recordCheck(NSString *result) {
+   NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:SETTINGS_DOMAIN];
+
+   [defaults setObject:result forKey:@"themeCheck"];
+   [defaults setObject:NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] ?: @"" forKey:@"themeCheckBuild"];
 }
 
 /**
@@ -1441,6 +1537,16 @@ __attribute__((constructor)) static void start(void) {
    if (![NSBundle.mainBundle.bundleIdentifier isEqual:LOGIC_BUNDLE_ID]) {
       return;
    }
+   NSString *missing = missingPart();
+
+   if (missing) {
+      recordCheck([@"off: " stringByAppendingString:missing]);
+      if (getenv("LP_OUT")) {
+         [[@"check=off " stringByAppendingString:missing] writeToFile:[[NSString stringWithUTF8String:getenv("LP_OUT")] stringByAppendingPathComponent:@"theme.log"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+      }
+      return;
+   }
+   recordCheck(@"ok");
    grayGamma = readSetting("LP_GAMMA", @"gamma", grayGamma, GAMMA_MIN, GAMMA_MAX);
    surfaceMax = readSetting("LP_SURFACE_MAX", @"surfaceMax", surfaceMax, SURFACE_MAX_MIN, 1);
    readAreaSettings();
@@ -1495,8 +1601,9 @@ __attribute__((constructor)) static void start(void) {
    toolbarOnColor = class_getInstanceVariable(objc_getClass("_TtC5Logic17ToolbarButtonCell"), "onColor");
    origToolbarImage = method_setImplementation(class_getInstanceMethod(objc_getClass("_TtC5Logic17ToolbarButtonCell"), @selector(drawImage:withFrame:inView:)), (IMP)hookToolbarImage);
    origButtonImage = method_setImplementation(class_getInstanceMethod([NSButtonCell class], @selector(drawImage:withFrame:inView:)), (IMP)hookButtonImage);
+   // Always installed: it keeps every plug-in window in the stock dark look.
+   origOrderWindow = method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), (IMP)hookOrderWindow);
    if (surfaceMax < 1) {
-      origOrderWindow = method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), (IMP)hookOrderWindow);
       scaledControlBackground = [NSColor colorWithSRGBRed:surfaceMax green:surfaceMax blue:surfaceMax alpha:1];
       origClipBackground = method_setImplementation(class_getInstanceMethod([NSClipView class], @selector(backgroundColor)), (IMP)hookClipBackground);
       if (objc_getClass("NSToolbarPlatterView")) {
