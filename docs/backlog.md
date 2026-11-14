@@ -10,9 +10,12 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
 
 ## Done
+
+- [x] **BL-4** `P2 · Low` **Bigger footer with copyright:** make "Powered by InPlug.app" bigger and add "© 2026 InPlug. All rights reserved." Adi asked 2026-11-14. Shipped as 1.1.2. · done 2026-11-14
 
 - [x] **BL-3** `P2 · Low` **Powered by InPlug.app footer:** a small "Powered by InPlug.app" line at the bottom of the app that opens https://inplug.app. Adi asked 2026-11-14. Shipped as 1.1.1. · done 2026-11-14
 

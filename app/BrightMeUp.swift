@@ -661,16 +661,20 @@ struct ContentView: View {
                   .controlSize(.large)
                   .disabled(!status.canStart)
             }
-            HStack(spacing: 4) {
-               Spacer()
-               Text("Powered by")
-               Link("InPlug.app", destination: URL(string: "https://inplug.app")!)
-                  .foregroundStyle(.tint)
-                  .help("Open inplug.app")
-               Spacer()
+            VStack(spacing: 3) {
+               HStack(spacing: 5) {
+                  Text("Powered by")
+                  Link("InPlug.app", destination: URL(string: "https://inplug.app")!)
+                     .fontWeight(.semibold)
+                     .foregroundStyle(.tint)
+                     .help("Open inplug.app")
+               }
+               .font(.body)
+               Text("© \(String(Calendar.current.component(.year, from: Date()))) InPlug. All rights reserved.")
+                  .font(.caption)
             }
-            .font(.caption)
             .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
          }
          .padding(20)
          .navigationTitle("BrightMeUp")
