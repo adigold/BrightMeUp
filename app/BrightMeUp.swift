@@ -10,7 +10,7 @@ let SURFACE_RANGE = SURFACE_MAX_MIN...1.0
 let GAMMA_RANGE = GAMMA_MIN...GAMMA_MAX
 let PRESET_MATCH = 0.005
 let CUSTOM = "Custom"
-let WINDOW_SIZE = CGSize(width: 940, height: 680)
+let WINDOW_SIZE = CGSize(width: 1000, height: 780)
 let SIDEBAR_WIDTH = 230.0
 let HEADER_WIDTH = 290.0
 let ROW_HEIGHT = 34.0
@@ -331,6 +331,7 @@ func getLaunchStatus() -> LaunchStatus {
  */
 struct MockStrip: View {
    let theme: ThemeValues
+   var isFramed = true
 
    var body: some View {
       VStack(spacing: 0) {
@@ -353,9 +354,11 @@ struct MockStrip: View {
             laneGrid
          }
          .frame(height: STRIP_FOOTER)
+         Spacer(minLength: 0)
       }
-      .clipShape(RoundedRectangle(cornerRadius: 8))
-      .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
+      .background(theme.gray(STOCK_LANE))
+      .clipShape(RoundedRectangle(cornerRadius: isFramed ? 8 : 0))
+      .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(isFramed ? AnyShapeStyle(.separator) : AnyShapeStyle(.clear)))
    }
 
    var separator: some View {
@@ -466,6 +469,7 @@ struct ContentView: View {
    @State var status = getLaunchStatus()
    @State var columns = NavigationSplitViewVisibility.all
    @State var showsStock = false
+   @AppStorage("previewKind") var previewKind = "tracks"
    @State var isNaming = false
    @State var newName = ""
 
@@ -506,18 +510,59 @@ struct ContentView: View {
    }
 
    /**
-    * The values that paint the preview: the tracks area values, or the stock grays.
+    * The values that paint the preview of an area: its own values, the overall values, or the
+    * stock grays for Before and for an area that keeps the original colors.
+    *
+    * @param key String - the area key
+    * @return ThemeValues - the values for that area
     */
-   var previewTheme: ThemeValues {
-      let tracks = areas["tracks"]
+   func themeFor(_ key: String) -> ThemeValues {
+      let value = areas[key]
 
-      if showsStock || tracks.mode == Int(AREA_MODE_ORIGINAL) {
-         return ThemeValues(surfaceMax: surfaceMax, gamma: gamma, isStock: true)
+      if showsStock || value.mode == Int(AREA_MODE_ORIGINAL) {
+         return ThemeValues(surfaceMax: 1, gamma: 1, isStock: true)
       }
-      if tracks.mode == Int(AREA_MODE_CUSTOM) {
-         return ThemeValues(surfaceMax: tracks.surfaceMax, gamma: tracks.gamma)
+      if value.mode == Int(AREA_MODE_CUSTOM) {
+         return ThemeValues(surfaceMax: value.surfaceMax, gamma: value.gamma)
       }
       return ThemeValues(surfaceMax: surfaceMax, gamma: gamma)
+   }
+
+   var previewCaption: String {
+      let kind = PREVIEW_KINDS.first { (k) in return k.key == previewKind } ?? PREVIEW_KINDS[1]
+      let modes = kind.areas.map { (key) -> String in
+         let name = AREAS.first { (a) in return a.key == key }?.name ?? key
+
+         switch areas[key].mode {
+         case Int(AREA_MODE_CUSTOM): return "\(name): Custom"
+         case Int(AREA_MODE_ORIGINAL): return "\(name): Original"
+         default: return "\(name): Overall"
+         }
+      }
+
+      return modes.joined(separator: " · ")
+   }
+
+   @ViewBuilder
+   var previewView: some View {
+      switch previewKind {
+      case "main":
+         MockMainWindow(controlBar: themeFor("controlbar"), inspector: themeFor("inspector"), tracks: themeFor("tracks"))
+      case "mixer":
+         MockMixer(theme: themeFor("mixer"))
+      case "pianoroll":
+         MockPianoRoll(theme: themeFor("editors"))
+      case "plugin":
+         MockPlugin(theme: themeFor("plugins"))
+      default:
+         MockStrip(theme: themeFor("tracks"))
+      }
+   }
+
+   func showPreview(for areaKey: String) {
+      if let kind = PREVIEW_FOR_AREA[areaKey] {
+         previewKind = kind
+      }
    }
 
    func apply(_ s: Double, _ g: Double, _ a: [String: AreaValue]) {
@@ -589,10 +634,16 @@ struct ContentView: View {
          .toolbar(removing: .sidebarToggle)
       } detail: {
          VStack(alignment: .leading, spacing: 14) {
-            HStack {
-               Text("Preview").font(.headline)
-               Text(areas["tracks"].mode == Int(AREA_MODE_OVERALL) ? "" : "Tracks area values")
-                  .font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+               Text("Preview").font(.headline).fixedSize()
+               Picker("Preview", selection: $previewKind) {
+                  ForEach(PREVIEW_KINDS) { (kind) in
+                     Text(kind.name).tag(kind.key)
+                  }
+               }
+               .pickerStyle(.segmented)
+               .labelsHidden()
+               .fixedSize()
                Spacer()
                Picker("Preview", selection: $showsStock) {
                   Text("Before").tag(true)
@@ -603,7 +654,15 @@ struct ContentView: View {
                .frame(width: 150)
                .help("Before shows stock Logic Pro. After shows your theme.")
             }
-            MockStrip(theme: previewTheme)
+            previewView
+               .frame(maxWidth: .infinity)
+               .frame(height: PREVIEW_HEIGHT)
+            Text(showsStock ? "Before: stock Logic Pro" : previewCaption)
+               .font(.caption)
+               .foregroundStyle(.secondary)
+               .frame(maxWidth: .infinity, alignment: .trailing)
+               .padding(.top, -8)
+               .animation(.easeInOut(duration: 0.15), value: previewKind)
                .accessibilityElement(children: .ignore)
                .accessibilityLabel(showsStock ? "Preview of stock Logic Pro tracks"
                   : "Preview of Logic Pro tracks with your theme")
@@ -670,7 +729,7 @@ struct ContentView: View {
                      .help("Open inplug.app")
                }
                .font(.body)
-               Text("© \(String(Calendar.current.component(.year, from: Date()))) InPlug. All rights reserved.")
+               Text("© \(String(Calendar.current.component(.year, from: Date()))) InPlug/AGsoundtrax LLC, All rights reserved.")
                   .font(.caption)
             }
             .foregroundStyle(.secondary)
@@ -679,7 +738,8 @@ struct ContentView: View {
          .padding(20)
          .navigationTitle("BrightMeUp")
       }
-      .frame(width: WINDOW_SIZE.width, height: WINDOW_SIZE.height)
+      .frame(minWidth: WINDOW_SIZE.width, idealWidth: 1180, maxWidth: .infinity, minHeight: WINDOW_SIZE.height,
+         idealHeight: 860, maxHeight: .infinity)
       .onReceive(workspace.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { (_) in
          status = getLaunchStatus()
       }
@@ -731,15 +791,22 @@ struct ContentView: View {
             }
             next.mode = newMode
             areas[area.key] = next
+            showPreview(for: area.key)
          }
       )
       let lightest = Binding<Double>(
          get: { return areas[area.key].surfaceMax },
-         set: { (v) in areas[area.key].surfaceMax = v }
+         set: { (v) in
+            areas[area.key].surfaceMax = v
+            showPreview(for: area.key)
+         }
       )
       let curve = Binding<Double>(
          get: { return areas[area.key].gamma },
-         set: { (v) in areas[area.key].gamma = v }
+         set: { (v) in
+            areas[area.key].gamma = v
+            showPreview(for: area.key)
+         }
       )
 
       return VStack(alignment: .leading, spacing: 8) {
@@ -890,6 +957,7 @@ struct LauncherApp: App {
       Window("BrightMeUp", id: "main") {
          ContentView()
       }
-      .windowResizability(.contentSize)
+      .windowResizability(.contentMinSize)
+      .defaultSize(width: 1180, height: 860)
    }
 }

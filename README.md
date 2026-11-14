@@ -68,6 +68,8 @@ The Areas tab splits Logic Pro into eight parts: the Tracks area, the Mixer, the
 
 The sidebar has 30 presets in six groups (Bright, Balanced, Dim, High contrast, Low contrast, By area). Save as Preset (Command S) keeps your own, areas included. Reset to Default (Command 0) puts everything back to the Light preset.
 
+The preview shows the Main window (control bar, inspector and tracks), the Tracks area, the Mixer, the Piano Roll or a plug-in, each painted with the values of its area. When you change an area, the preview switches to it. The window resizes and goes full screen.
+
 ## Change the brightness
 
 You decide how light the theme is. A white interface is good in a bright room, but many people find it too bright for long sessions. You can make all the surfaces darker and keep the text black, or select a point between the two.

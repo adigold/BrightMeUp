@@ -11,9 +11,12 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
 
 ## Done
+
+- [x] **BL-5** `P1 · Medium` **Resizable window and area previews:** let the app window resize and go full screen, and add live previews for the Mixer, Piano Roll, a plug-in and the main window (control bar and inspector), switching the preview to the area being edited. Adi asked 2026-11-14. Shipped as 1.2.0, with the copyright line changed to InPlug/AGsoundtrax LLC. · done 2026-11-14
 
 - [x] **BL-4** `P2 · Low` **Bigger footer with copyright:** make "Powered by InPlug.app" bigger and add "© 2026 InPlug. All rights reserved." Adi asked 2026-11-14. Shipped as 1.1.2. · done 2026-11-14
 
