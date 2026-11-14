@@ -1652,11 +1652,14 @@ static NSSet<NSString *> *listSingleAppearanceNames(void) {
    NSString *contents = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Contents"];
    NSString *build = NSBundle.mainBundle.infoDictionary[@"CFBundleVersion"] ?: @"unknown";
    NSString *dir = [NSHomeDirectory() stringByAppendingPathComponent:COLOR_CACHE_DIR];
-   NSString *cache = [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"logic-colors-%@.txt", build]];
+   NSString *cache = [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"logic-colors-v2-%@.txt", build]];
    NSString *saved = [NSString stringWithContentsOfFile:cache encoding:NSUTF8StringEncoding error:nil];
    NSString *frameworks = [contents stringByAppendingPathComponent:@"Frameworks"];
    NSMutableArray<NSString *> *catalogs = [NSMutableArray arrayWithObject:[contents stringByAppendingPathComponent:@"Resources/Assets.car"]];
    NSMutableDictionary<NSString *, NSMutableSet *> *appearances = [NSMutableDictionary dictionary];
+   // Colors from the catalogs of plug-in frameworks belong to plug-ins and are never mapped,
+   // not even when a Logic catalog has the same name (Adi, 2026-11-14: ChromaVerb graph).
+   NSMutableDictionary<NSString *, NSMutableSet *> *pluginColors = [NSMutableDictionary dictionary];
    NSMutableArray<NSString *> *names = [NSMutableArray array];
 
    if (saved.length > 0) {
@@ -1672,10 +1675,15 @@ static NSSet<NSString *> *listSingleAppearanceNames(void) {
       }
    }
    dispatch_apply(catalogs.count, dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^(size_t i) {
-      addCatalogColors(catalogs[i], appearances);
+      BOOL isPlugin = NO;
+
+      for (size_t p = 0; p < sizeof(PLUGIN_PATHS) / sizeof(PLUGIN_PATHS[0]); p++) {
+         isPlugin = isPlugin || strstr(catalogs[i].UTF8String, PLUGIN_PATHS[p]) != NULL;
+      }
+      addCatalogColors(catalogs[i], isPlugin ? pluginColors : appearances);
    });
    for (NSString *name in appearances) {
-      if (appearances[name].count == 1) {
+      if (appearances[name].count == 1 && !pluginColors[name]) {
          [names addObject:name];
       }
    }
