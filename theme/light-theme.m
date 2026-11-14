@@ -62,7 +62,8 @@ static volatile int logicRangeCount = 0;
 static ImageRange pluginRanges[MAX_RANGES];
 static volatile int pluginRangeCount = 0;
 static const char *const PLUGIN_PATHS[] = { "/MAPlugInGUI.framework/", "/MAPlugInGUISwift.framework/", "/MAAlchemy.framework/",
-   "/MAGenerativeInstrumentsUI.framework/", "/Audio/Plug-Ins/", ".component/", ".vst3/", ".vst/", ".appex/" };
+   "/MAGenerativeInstrumentsUI.framework/", "/MADSP.framework/", "/MADSPCore.framework/",
+   "/MADSPPlugInPublic.framework/", "/MAResourcesPlugInsShared.framework/", "/Audio/Plug-Ins/", ".component/", ".vst3/", ".vst/", ".appex/" };
 static double grayGamma = GAMMA_DEFAULT;
 static double surfaceMax = SURFACE_MAX_DEFAULT;
 
@@ -74,6 +75,10 @@ static AreaSetting areaSettings[AREA_COUNT];
 static NSAppearance *trueAqua;
 // The real dark appearance, which plug-in windows keep. Nothing else in Logic Pro uses it.
 static NSAppearance *trueDarkAqua;
+// Its own light appearance object for every dark request the theme answers with light. Inside a
+// plug-in window any view holding it is set back to the real dark appearance, so a plug-in that
+// asks for dark always gets dark (Adi, 2026-11-14: never touch a plug-in).
+static NSAppearance *mappedAqua;
 static CGColorSpaceRef srgbSpace;
 static NSString *outDir;
 static int recoloredImages = 0;
@@ -521,6 +526,9 @@ static NSAppearance *hookAppearanceNamed(id cls, SEL sel, NSAppearanceName name)
       mapped = NSAppearanceNameAqua;
    } else if ([name isEqualToString:NSAppearanceNameVibrantDark]) {
       mapped = NSAppearanceNameVibrantLight;
+   }
+   if (mappedAqua && mapped != name && [mapped isEqualToString:NSAppearanceNameAqua]) {
+      return mappedAqua;
    }
    return ((NSAppearance *(*)(id, SEL, NSAppearanceName))origAppearanceNamed)(cls, sel, mapped);
 }
@@ -1275,7 +1283,7 @@ static id __attribute__((ns_returns_retained)) hookAppearanceDecode(__attribute_
    if (isRealtimeThread() || isPluginOnStack()) {
       return decoded;
    }
-   return [decoded.name isEqualToString:NSAppearanceNameDarkAqua] ? trueAqua : decoded;
+   return [decoded.name isEqualToString:NSAppearanceNameDarkAqua] ? mappedAqua : decoded;
 }
 
 // AppKit blends the header with plus darker under VibrantLight, which paints a black bar.
@@ -1332,6 +1340,40 @@ static void hookButtonImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect 
 // The macOS 26 title bar is glass, which is white in Aqua. A transparent title bar shows the
 // window background. The main window uses the mapped BackgroundViewControlbar color, but the
 // editor windows use the system windowBackgroundColor, which the theme does not map.
+/**
+ * Gives every view in a plug-in window that holds the theme's light appearance the real dark
+ * appearance back, so the plug-in draws exactly as in stock Logic Pro.
+ *
+ * @param view NSView * - the top of the view tree
+ */
+static void restorePluginAppearance(NSView *view) {
+   if (!view) {
+      return;
+   }
+   if (view.appearance == mappedAqua) {
+      view.appearance = trueDarkAqua;
+   }
+   for (NSView *child in view.subviews) {
+      restorePluginAppearance(child);
+   }
+}
+
+static IMP origViewMoved, origViewSetAppearance;
+
+static void hookViewMoved(NSView *view, SEL sel) {
+   ((void (*)(id, SEL))origViewMoved)(view, sel);
+   if (!isRealtimeThread() && view.window && isPluginWindow(view.window)) {
+      restorePluginAppearance(view);
+   }
+}
+
+static void hookViewSetAppearance(NSView *view, SEL sel, NSAppearance *appearance) {
+   if (appearance == mappedAqua && !isRealtimeThread() && view.window && isPluginWindow(view.window)) {
+      appearance = trueDarkAqua;
+   }
+   ((void (*)(id, SEL, NSAppearance *))origViewSetAppearance)(view, sel, appearance);
+}
+
 static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode place, NSInteger other) {
    if (isRealtimeThread()) {
       ((void (*)(id, SEL, NSWindowOrderingMode, NSInteger))origOrderWindow)(window, sel, place, other);
@@ -1343,6 +1385,7 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
       if (window.appearance != trueDarkAqua) {
          window.appearance = trueDarkAqua;
       }
+      restorePluginAppearance(window.contentView.superview ?: window.contentView);
    } else if (surfaceMax < 1 && place != NSWindowOut && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
       window.titlebarAppearsTransparent = YES;
       if ([window.backgroundColor isEqual:NSColor.windowBackgroundColor]) {
@@ -1475,6 +1518,8 @@ static NSString *missingPart(void) {
       @[ @"NSTextView", @"setTypingAttributes:" ],
       @[ @"NSApplication", @"setAppearance:" ],
       @[ @"NSClipView", @"backgroundColor" ],
+      @[ @"NSView", @"viewDidMoveToWindow" ],
+      @[ @"NSView", @"setAppearance:" ],
    ];
    NSArray<NSString *> *colorMethods = @[ @"colorWithCalibratedWhite:alpha:", @"colorWithDeviceWhite:alpha:", @"colorWithWhite:alpha:",
       @"colorWithGenericGamma22White:alpha:", @"colorWithCalibratedRed:green:blue:alpha:", @"colorWithDeviceRed:green:blue:alpha:",
@@ -1664,6 +1709,7 @@ __attribute__((constructor)) static void start(void) {
    singleAppearanceNames = listSingleAppearanceNames();
    trueAqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
    trueDarkAqua = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+   mappedAqua = [[NSAppearance alloc] initWithAppearanceNamed:NSAppearanceNameAqua bundle:nil];
    _dyld_register_func_for_add_image(addImage);
    // These symbols bound the three arrange view region functions, which are adjacent in Logic.
    regionDrawStart = (uintptr_t)dlsym(RTLD_DEFAULT, "_ZNK9CRegionUI31drawRegionInArrangeViewWithFlexEv");
@@ -1711,6 +1757,8 @@ __attribute__((constructor)) static void start(void) {
    toolbarOnColor = class_getInstanceVariable(objc_getClass("_TtC5Logic17ToolbarButtonCell"), "onColor");
    origToolbarImage = method_setImplementation(class_getInstanceMethod(objc_getClass("_TtC5Logic17ToolbarButtonCell"), @selector(drawImage:withFrame:inView:)), (IMP)hookToolbarImage);
    origButtonImage = method_setImplementation(class_getInstanceMethod([NSButtonCell class], @selector(drawImage:withFrame:inView:)), (IMP)hookButtonImage);
+   origViewMoved = method_setImplementation(class_getInstanceMethod([NSView class], @selector(viewDidMoveToWindow)), (IMP)hookViewMoved);
+   origViewSetAppearance = method_setImplementation(class_getInstanceMethod([NSView class], @selector(setAppearance:)), (IMP)hookViewSetAppearance);
    // Always installed: it keeps every plug-in window in the stock dark look.
    origOrderWindow = method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), (IMP)hookOrderWindow);
    if (surfaceMax < 1) {
