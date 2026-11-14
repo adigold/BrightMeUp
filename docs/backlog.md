@@ -13,9 +13,12 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
 
 ## Done
+
+- [x] **BL-7** `P1 · Medium` **Clearer launch status:** rewrite the status messages in plain words, and when Logic Pro is open offer a Restart Logic Pro button that quits it (Logic asks to save) and reopens it with the look. Adi asked 2026-11-14. Shipped as 1.2.2. · done 2026-11-14
 
 - [x] **BL-6** `P1 · High` **Preview overflows the window:** the Piano Roll preview pushed the page wider than a small window, so content went off the left edge. Make every preview fit any window size. Adi reported 2026-11-14. Fixed in 1.2.1; all five previews checked at the smallest window size. · done 2026-11-14
 

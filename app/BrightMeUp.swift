@@ -254,24 +254,28 @@ struct ThemeValues {
 }
 
 enum LaunchStatus {
-   case ready, logicRunning, logicMissing, libraryMissing, failed(String)
+   case ready, logicRunning, waitingForQuit, logicMissing, libraryMissing, failed(String)
    case logicUntested(tested: String, installed: String)
 
    var text: String {
       switch self {
-      case .ready: return "Ready. Logic Pro starts with the theme."
-      case .logicRunning: return "Quit Logic Pro first. The theme loads only at launch."
-      case .logicMissing: return "Logic Pro is not in the Applications folder."
-      case .libraryMissing: return "The theme library is missing. Download the app again."
+      case .ready: return "Ready. Click Start Logic Pro to open it with your new look."
+      case .logicRunning:
+         return "Logic Pro is open now. Your look is added when Logic Pro starts, so Logic Pro needs to restart. Click Restart Logic Pro. Logic Pro asks you to save first."
+      case .waitingForQuit:
+         return "Waiting for Logic Pro to close. If it asks to save, choose Save. It then opens again with your new look."
+      case .logicMissing: return "Logic Pro was not found in your Applications folder."
+      case .libraryMissing: return "Part of BrightMeUp is missing. Please download the app again."
       case .logicUntested(let tested, let installed):
-         return "Tested with Logic Pro build \(tested), but you have build \(installed). Some parts can stay dark."
-      case .failed(let error): return "Logic Pro did not start. \(error)"
+         return "Ready. This version was made for Logic Pro build \(tested) and you have build \(installed). Most of the look works, a few parts may stay dark."
+      case .failed(let error): return "Logic Pro did not open. \(error)"
       }
    }
 
    var symbol: String {
       switch self {
       case .ready: return "checkmark.circle.fill"
+      case .logicRunning, .waitingForQuit: return "arrow.clockwise.circle.fill"
       case .failed: return "xmark.octagon.fill"
       default: return "exclamationmark.triangle.fill"
       }
@@ -280,14 +284,22 @@ enum LaunchStatus {
    var tint: Color {
       switch self {
       case .ready: return .green
+      case .logicRunning, .waitingForQuit: return .blue
       case .failed: return .red
       default: return .orange
       }
    }
 
+   var isRestart: Bool {
+      switch self {
+      case .logicRunning, .waitingForQuit: return true
+      default: return false
+      }
+   }
+
    var canStart: Bool {
       switch self {
-      case .ready, .logicUntested, .failed: return true
+      case .ready, .logicUntested, .failed, .logicRunning: return true
       default: return false
       }
    }
@@ -717,7 +729,13 @@ struct ContentView: View {
                Image(systemName: status.symbol).foregroundStyle(status.tint)
                Text(status.text).foregroundStyle(.secondary).lineLimit(2)
                Spacer()
-               Button("Start Logic Pro", action: startLogic)
+               Button(status.isRestart ? "Restart Logic Pro" : "Start Logic Pro") {
+                  if case .logicRunning = status {
+                     restartLogic()
+                  } else {
+                     startLogic()
+                  }
+               }
                   .keyboardShortcut(.defaultAction)
                   .controlSize(.large)
                   .disabled(!status.canStart)
@@ -743,9 +761,15 @@ struct ContentView: View {
       .frame(minWidth: WINDOW_SIZE.width, idealWidth: 1180, maxWidth: .infinity, minHeight: WINDOW_SIZE.height,
          idealHeight: 860, maxHeight: .infinity)
       .onReceive(workspace.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { (_) in
+         if case .waitingForQuit = status {
+            return
+         }
          status = getLaunchStatus()
       }
       .onReceive(workspace.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { (_) in
+         if case .waitingForQuit = status {
+            return
+         }
          status = getLaunchStatus()
       }
    }
@@ -902,6 +926,29 @@ struct ContentView: View {
 
    func percent(_ value: Double) -> String {
       return "\(Int((value * 100).rounded()))%"
+   }
+
+   /**
+    * Asks Logic Pro to quit, the same as Quit in its menu, so it asks to save open work. When it
+    * has quit, starts it again with the theme. If the user cancels the quit, nothing else happens.
+    */
+   func restartLogic() {
+      for app in NSRunningApplication.runningApplications(withBundleIdentifier: LOGIC_ID) {
+         app.terminate()
+      }
+      status = .waitingForQuit
+      Task { @MainActor in
+         // Up to five minutes, which leaves time to answer a save prompt.
+         for _ in 0..<600 {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if !isLogicRunning() {
+               status = getLaunchStatus()
+               startLogic()
+               return
+            }
+         }
+         status = getLaunchStatus()
+      }
    }
 
    /**
