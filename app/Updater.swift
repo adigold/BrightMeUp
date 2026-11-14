@@ -61,8 +61,11 @@ func run(_ path: String, _ arguments: [String]) -> Bool {
 @MainActor
 final class Updater: ObservableObject {
    enum State: Equatable {
-      case idle, available(UpdateInfo), updating, failed(UpdateInfo, String)
+      case idle, checking, available(UpdateInfo), upToDate, unreachable, updating, failed(UpdateInfo, String)
    }
+
+   // One updater for the window and the Check for Updates menu item.
+   static let shared = Updater()
 
    @Published var state = State.idle
    @Published var isDismissed = false
@@ -72,10 +75,18 @@ final class Updater: ObservableObject {
    }
 
    /**
-    * Asks GitHub for the latest release. Says nothing when there is no newer one or no network.
+    * Asks GitHub for the latest release. The check at launch says nothing when there is no newer
+    * one or no network; a check from the menu always answers.
+    *
+    * @param isManual Bool - true when the user chose Check for Updates
     */
-   func check() async {
+   func check(isManual: Bool = false) async {
       var request = URLRequest(url: RELEASES_API, timeoutInterval: 15)
+
+      if isManual {
+         isDismissed = false
+         state = .checking
+      }
 
       request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
       request.setValue("BrightMeUp/\(current)", forHTTPHeaderField: "User-Agent")
@@ -86,6 +97,9 @@ final class Updater: ObservableObject {
          let assets = release["assets"] as? [[String: Any]],
          let asset = assets.first(where: { (a) in return a["name"] as? String == UPDATE_ASSET }),
          let link = asset["browser_download_url"] as? String, let download = URL(string: link) else {
+         if isManual {
+            state = .unreachable
+         }
          return
       }
       let page = (release["html_url"] as? String).flatMap(URL.init(string:)) ?? RELEASES_PAGE
@@ -93,6 +107,8 @@ final class Updater: ObservableObject {
 
       if isNewer(version, than: current) {
          state = .available(UpdateInfo(version: version, download: download, page: page))
+      } else if isManual {
+         state = .upToDate
       }
    }
 
@@ -170,6 +186,19 @@ struct UpdateBar: View {
             Button("Later") { updater.isDismissed = true }
             Button("Update Now") { Task { await updater.install(info) } }
                .buttonStyle(.borderedProminent)
+         }
+      case .checking:
+         bar(symbol: "arrow.triangle.2.circlepath", text: "Checking for updates...") {
+            ProgressView().controlSize(.small)
+         }
+      case .upToDate:
+         bar(symbol: "checkmark.circle.fill", text: "You have the latest version, BrightMeUp \(updater.current).") {
+            Button("OK") { updater.state = .idle }
+         }
+      case .unreachable:
+         bar(symbol: "wifi.exclamationmark", text: "BrightMeUp could not reach GitHub to check for updates. Check your internet connection and try again.") {
+            Button("OK") { updater.state = .idle }
+            Button("Open GitHub") { NSWorkspace.shared.open(RELEASES_PAGE) }
          }
       case .updating:
          bar(symbol: "arrow.down.circle", text: "Downloading and installing the update...") {

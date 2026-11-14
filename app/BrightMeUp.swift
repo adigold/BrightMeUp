@@ -502,7 +502,7 @@ struct ContentView: View {
    @State var isNaming = false
    @State var newName = ""
    @State var isConfirmingRevert = false
-   @StateObject var updater = Updater()
+   @ObservedObject var updater = Updater.shared
 
    var isWaiting: Bool {
       switch status {
@@ -1086,6 +1086,14 @@ struct LauncherApp: App {
       }
       .windowResizability(.contentMinSize)
       .defaultSize(width: 1180, height: 860)
+      .commands {
+         CommandGroup(after: .appInfo) {
+            Button("Check for Updates...") {
+               NSApp.activate(ignoringOtherApps: true)
+               Task { await Updater.shared.check(isManual: true) }
+            }
+         }
+      }
    }
 }
 #endif
