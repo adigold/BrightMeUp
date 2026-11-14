@@ -11,7 +11,8 @@
 
 <p align="center">
   <a href="https://github.com/adigold/BrightMeUp/releases/latest/download/BrightMeUp.dmg"><img src="https://img.shields.io/badge/Download_for_Mac-FF8C28?style=for-the-badge&logo=apple&logoColor=white" height="48" alt="Download for Mac"></a><br>
-  For Logic Pro 13 on Macs with Apple silicon.
+  For Logic Pro 13 on Macs with Apple silicon.<br>
+  <b>Tested only with Logic Pro 13. Earlier versions, such as Logic Pro 12, are not supported.</b>
 </p>
 
 <p align="center">
@@ -54,6 +55,8 @@ BrightMeUp is signed and notarized by Apple, so it opens with no warning.
 All versions are on the [Releases page](https://github.com/adigold/BrightMeUp/releases). Each release also has a `BrightMeUp.zip` if you prefer a zip file.
 
 ### Requirements
+
+**BrightMeUp is tested only with Logic Pro 13. It is not tested with Logic Pro 12 or earlier, so please do not use it with those versions.**
 
 - Logic Pro 13.0
 - A Mac with Apple silicon

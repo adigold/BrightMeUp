@@ -30,6 +30,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 ## Done
 
+- [x] **BL-20** `P2 · Medium` **README: tested only with Logic Pro 13, in bold:** under the download button and in Requirements. Adi asked 2026-11-14. · done 2026-11-14
+
 - [x] **BL-19** `P3 · Low` **Version next to the title, and 1.3.0:** show the app version under the BrightMeUp title, and number the safety release 1.3.0. Adi asked 2026-11-14. Published as v1.3.0 after Adi tested it ("working"). · done 2026-11-14
 
 - [x] **BL-16** `P1 · High` **Safety: never act on audio threads:** every hook does nothing on real-time (audio) threads, and test mode counts any such call. Adi asked 2026-11-14. Done in 1.2.6: isRealtimeThread() in every hook, unit tested with a real-time thread. · done 2026-11-14
