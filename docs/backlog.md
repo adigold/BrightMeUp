@@ -24,6 +24,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 ## Now
 
+- [~] **BL-22** `P0 · Urgent` **ChromaVerb graph turned light:** the graph area inside ChromaVerb (and other plug-ins with graphs: EnVerb, Channel EQ, Tremolo, Ensemble, ADSR) was lightened, because MAVectorUIKit, which draws those graphs, was missing from the plug-in list. Add it so plug-ins stay stock. Adi reported 2026-11-14.
+
 - [~] **BL-18** `P1 · High` **Null test:** prove the audio is identical with and without BrightMeUp by comparing two bounces sample by sample. Adi asked 2026-11-14. tools/null-test.sh written and self-tested; needs two bounces of the same project (stock and BrightMeUp).
 
 - [~] **BL-17** `P1 · High` **Release gate:** a script that launches Logic Pro with the theme on a test project, checks plug-in windows, playback and crash reports, and must pass before any release. Adi asked 2026-11-14. tools/release-check.sh written; needs the test project (Manzana copy saved with plug-in windows open) and a run with Logic Pro closed.

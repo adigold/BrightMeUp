@@ -63,7 +63,7 @@ static ImageRange pluginRanges[MAX_RANGES];
 static volatile int pluginRangeCount = 0;
 static const char *const PLUGIN_PATHS[] = { "/MAPlugInGUI.framework/", "/MAPlugInGUISwift.framework/", "/MAAlchemy.framework/",
    "/MAGenerativeInstrumentsUI.framework/", "/MADSP.framework/", "/MADSPCore.framework/",
-   "/MADSPPlugInPublic.framework/", "/MAResourcesPlugInsShared.framework/", "/Audio/Plug-Ins/", ".component/", ".vst3/", ".vst/", ".appex/" };
+   "/MADSPPlugInPublic.framework/", "/MAResourcesPlugInsShared.framework/", "/MAVectorUIKit.framework/", "/Audio/Plug-Ins/", ".component/", ".vst3/", ".vst/", ".appex/" };
 static double grayGamma = GAMMA_DEFAULT;
 static double surfaceMax = SURFACE_MAX_DEFAULT;
 
@@ -493,7 +493,9 @@ static CGColorRef hookCGColor(id named, SEL sel) {
    id tag;
    CGColorRef mapped;
 
-   if (shouldSkip() || isPluginCaller(__builtin_return_address(0))) {
+   // A plug-in can reach a catalog color through AppKit, so after the first plug-in window the
+   // whole stack is checked too (Adi, 2026-11-14: ChromaVerb graph).
+   if (shouldSkip() || isPluginCaller(__builtin_return_address(0)) || (atomic_load_explicit(&hasPluginWindow, memory_order_acquire) && isPluginOnStack())) {
       return realCGColor(named);
    }
    tag = objc_getAssociatedObject(named, &mappedKey);
@@ -953,7 +955,7 @@ static BOOL hookRepDraw(NSImageRep *rep, SEL sel, NSRect rect, NSRect from, NSCo
       return ((RepDraw)origRepDraw)(rep, sel, rect, from, op, fraction, flipped, hints);
    }
    isSmall = rep.size.width <= DRAW_IMAGE_MAX && rep.size.height <= DRAW_IMAGE_MAX;
-   if (isLogicCaller(__builtin_return_address(0)) && isSmall) {
+   if (isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && isSmall) {
       id tag = objc_getAssociatedObject(rep, &mappedKey);
 
       if (!tag) {
@@ -970,7 +972,7 @@ static BOOL hookRepDraw(NSImageRep *rep, SEL sel, NSRect rect, NSRect from, NSCo
 }
 
 static void hookImageDraw(NSImage *image, SEL sel, NSRect rect, NSRect from, NSCompositingOperation op, CGFloat fraction, BOOL flipped, NSDictionary *hints) {
-   NSImage *shown = isLogicCaller(__builtin_return_address(0)) && !shouldSkip() ? drawableImage(image) : image;
+   NSImage *shown = isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !shouldSkip() ? drawableImage(image) : image;
 
    ((ImageDraw)origImageDraw)(shown, sel, rect, from, op, fraction, flipped, hints);
 }
@@ -991,7 +993,7 @@ static NSImageRep *hookBestRep(NSImage *image, SEL sel, NSRect rect, NSGraphicsC
 }
 
 static void interposeThreePart(NSRect frame, NSImage *start, NSImage *center, NSImage *end, BOOL vertical, NSCompositingOperation op, CGFloat fraction, BOOL flipped) {
-   if (isLogicCaller(__builtin_return_address(0)) && !shouldSkip()) {
+   if (isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !shouldSkip()) {
       start = drawableImage(start);
       center = drawableImage(center);
       end = drawableImage(end);
