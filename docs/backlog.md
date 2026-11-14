@@ -7,6 +7,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 ## Inbox
 
+- [ ] **BL-19** `P3 · Low` **Version next to the title, and 1.3.0:** show the app version under the BrightMeUp title, and number the safety release 1.3.0. Adi asked 2026-11-14.
+
 
 
 

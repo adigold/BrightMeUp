@@ -786,6 +786,7 @@ struct ContentView: View {
          }
          .padding(20)
          .navigationTitle("BrightMeUp")
+         .navigationSubtitle("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
          .toolbar {
             ToolbarItem(placement: .primaryAction) {
                Button {
