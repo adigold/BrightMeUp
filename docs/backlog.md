@@ -14,9 +14,12 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
 
 ## Done
+
+- [x] **BL-8** `P1 · Medium` **Revert to Logic Defaults button:** a big button at the top right that asks "Are you sure?" and then restarts Logic Pro in its original look, without BrightMeUp. Adi asked 2026-11-14. Shipped as 1.2.3. · done 2026-11-14
 
 - [x] **BL-7** `P1 · Medium` **Clearer launch status:** rewrite the status messages in plain words, and when Logic Pro is open offer a Restart Logic Pro button that quits it (Logic asks to save) and reopens it with the look. Adi asked 2026-11-14. Shipped as 1.2.2. · done 2026-11-14
 

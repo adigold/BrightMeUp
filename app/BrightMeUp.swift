@@ -254,7 +254,7 @@ struct ThemeValues {
 }
 
 enum LaunchStatus {
-   case ready, logicRunning, waitingForQuit, logicMissing, libraryMissing, failed(String)
+   case ready, logicRunning, waitingForQuit, waitingForRevert, logicMissing, libraryMissing, failed(String)
    case logicUntested(tested: String, installed: String)
 
    var text: String {
@@ -264,6 +264,8 @@ enum LaunchStatus {
          return "Logic Pro is open now. Your look is added when Logic Pro starts, so Logic Pro needs to restart. Click Restart Logic Pro. Logic Pro asks you to save first."
       case .waitingForQuit:
          return "Waiting for Logic Pro to close. If it asks to save, choose Save. It then opens again with your new look."
+      case .waitingForRevert:
+         return "Waiting for Logic Pro to close. If it asks to save, choose Save. It then opens again in its original look."
       case .logicMissing: return "Logic Pro was not found in your Applications folder."
       case .libraryMissing: return "Part of BrightMeUp is missing. Please download the app again."
       case .logicUntested(let tested, let installed):
@@ -275,7 +277,7 @@ enum LaunchStatus {
    var symbol: String {
       switch self {
       case .ready: return "checkmark.circle.fill"
-      case .logicRunning, .waitingForQuit: return "arrow.clockwise.circle.fill"
+      case .logicRunning, .waitingForQuit, .waitingForRevert: return "arrow.clockwise.circle.fill"
       case .failed: return "xmark.octagon.fill"
       default: return "exclamationmark.triangle.fill"
       }
@@ -284,15 +286,22 @@ enum LaunchStatus {
    var tint: Color {
       switch self {
       case .ready: return .green
-      case .logicRunning, .waitingForQuit: return .blue
+      case .logicRunning, .waitingForQuit, .waitingForRevert: return .blue
       case .failed: return .red
       default: return .orange
       }
    }
 
+   var isMissing: Bool {
+      if case .logicMissing = self {
+         return true
+      }
+      return false
+   }
+
    var isRestart: Bool {
       switch self {
-      case .logicRunning, .waitingForQuit: return true
+      case .logicRunning, .waitingForQuit, .waitingForRevert: return true
       default: return false
       }
    }
@@ -484,6 +493,14 @@ struct ContentView: View {
    @AppStorage("previewKind") var previewKind = "tracks"
    @State var isNaming = false
    @State var newName = ""
+   @State var isConfirmingRevert = false
+
+   var isWaiting: Bool {
+      switch status {
+      case .waitingForQuit, .waitingForRevert: return true
+      default: return false
+      }
+   }
 
    var saved: [SavedPreset] {
       return decodeSaved(savedJSON)
@@ -757,17 +774,40 @@ struct ContentView: View {
          }
          .padding(20)
          .navigationTitle("BrightMeUp")
+         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+               Button {
+                  isConfirmingRevert = true
+               } label: {
+                  Label("Revert to Logic Defaults", systemImage: "arrow.uturn.backward.circle")
+                     .labelStyle(.titleAndIcon)
+                     .font(.body.weight(.semibold))
+                     .padding(.horizontal, 6)
+               }
+               .buttonStyle(.borderedProminent)
+               .tint(.orange)
+               .controlSize(.large)
+               .disabled(isWaiting || status.isMissing)
+               .help("Restart Logic Pro in its original look, without BrightMeUp")
+            }
+         }
+         .alert("Are you sure you want to go back to the original Logic Pro look?", isPresented: $isConfirmingRevert) {
+            Button("Revert and Restart Logic Pro", role: .destructive) { revertToLogicDefaults() }
+            Button("Cancel", role: .cancel) {}
+         } message: {
+            Text("Logic Pro will restart without BrightMeUp. If it is open, it asks you to save first. Your BrightMeUp settings stay saved, so you can come back any time with Start Logic Pro.")
+         }
       }
       .frame(minWidth: WINDOW_SIZE.width, idealWidth: 1180, maxWidth: .infinity, minHeight: WINDOW_SIZE.height,
          idealHeight: 860, maxHeight: .infinity)
       .onReceive(workspace.publisher(for: NSWorkspace.didLaunchApplicationNotification)) { (_) in
-         if case .waitingForQuit = status {
+         if isWaiting {
             return
          }
          status = getLaunchStatus()
       }
       .onReceive(workspace.publisher(for: NSWorkspace.didTerminateApplicationNotification)) { (_) in
-         if case .waitingForQuit = status {
+         if isWaiting {
             return
          }
          status = getLaunchStatus()
@@ -932,18 +972,18 @@ struct ContentView: View {
     * Asks Logic Pro to quit, the same as Quit in its menu, so it asks to save open work. When it
     * has quit, starts it again with the theme. If the user cancels the quit, nothing else happens.
     */
-   func restartLogic() {
+   func restartLogic(withTheme: Bool = true) {
       for app in NSRunningApplication.runningApplications(withBundleIdentifier: LOGIC_ID) {
          app.terminate()
       }
-      status = .waitingForQuit
+      status = withTheme ? .waitingForQuit : .waitingForRevert
       Task { @MainActor in
          // Up to five minutes, which leaves time to answer a save prompt.
          for _ in 0..<600 {
             try? await Task.sleep(nanoseconds: 500_000_000)
             if !isLogicRunning() {
                status = getLaunchStatus()
-               startLogic()
+               startLogic(withTheme: withTheme)
                return
             }
          }
@@ -954,10 +994,23 @@ struct ContentView: View {
    /**
     * Starts Logic Pro with the theme library from this app bundle, then quits this app.
     */
-   func startLogic() {
-      let open = Process()
+   /**
+    * Restarts Logic Pro, or starts it if it is closed, in its original look without the theme.
+    * The BrightMeUp settings stay as they are.
+    */
+   func revertToLogicDefaults() {
+      if isLogicRunning() {
+         restartLogic(withTheme: false)
+      } else {
+         startLogic(withTheme: false)
+      }
+   }
 
-      guard let library = Bundle.main.path(forResource: "light-theme", ofType: "dylib") else {
+   func startLogic(withTheme: Bool = true) {
+      let open = Process()
+      let library = Bundle.main.path(forResource: "light-theme", ofType: "dylib")
+
+      if withTheme && library == nil {
          return
       }
       if isLogicRunning() {
@@ -965,7 +1018,8 @@ struct ContentView: View {
          return
       }
       open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-      open.arguments = [ "-n", "--env", "DYLD_INSERT_LIBRARIES=\(library)", "-a", LOGIC_PATH ]
+      open.arguments = withTheme ? [ "-n", "--env", "DYLD_INSERT_LIBRARIES=\(library!)", "-a", LOGIC_PATH ]
+         : [ "-a", LOGIC_PATH ]
       do {
          try open.run()
          open.waitUntilExit()
