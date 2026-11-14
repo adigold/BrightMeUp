@@ -40,7 +40,6 @@ Logic Pro only comes in dark. That is great at night, but in a bright room or on
 
 ## Download and install
 
-**[Download BrightMeUp for Mac](https://github.com/adigold/BrightMeUp/releases/latest/download/BrightMeUp.dmg)**
 
 1. Click the link above. Your browser downloads `BrightMeUp.dmg`.
 2. Double-click `BrightMeUp.dmg`. A window opens.
