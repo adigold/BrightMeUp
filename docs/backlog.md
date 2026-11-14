@@ -24,7 +24,6 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 ## Now
 
-- [~] **BL-22** `P0 · Urgent` **ChromaVerb graph turned light:** the graph area inside ChromaVerb (and other plug-ins with graphs: EnVerb, Channel EQ, Tremolo, Ensemble, ADSR) was lightened, because MAVectorUIKit, which draws those graphs, was missing from the plug-in list. Add it so plug-ins stay stock. Real cause (found after 1.3.3): the theme also mapped 2276 colors from the plug-in color catalog (MAPlugInGUISwift), e.g. WhiteReverbPluginDisplayBackground. 1.3.4 never maps plug-in catalog colors. Adi reported 2026-11-14.
 
 - [~] **BL-18** `P1 · High` **Null test:** prove the audio is identical with and without BrightMeUp by comparing two bounces sample by sample. Adi asked 2026-11-14. tools/null-test.sh written and self-tested; needs two bounces of the same project (stock and BrightMeUp).
 
@@ -32,6 +31,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 ## Done
+
+- [x] **BL-22** `P0 · Urgent` **ChromaVerb graph turned light:** the graph area inside ChromaVerb (and other plug-ins with graphs: EnVerb, Channel EQ, Tremolo, Ensemble, ADSR) was lightened, because MAVectorUIKit, which draws those graphs, was missing from the plug-in list. Add it so plug-ins stay stock. Real cause (found after 1.3.3): the theme also mapped 2276 colors from the plug-in color catalog (MAPlugInGUISwift), e.g. WhiteReverbPluginDisplayBackground. 1.3.4 never maps plug-in catalog colors. Adi reported 2026-11-14. 1.3.5 adds a window-based draw guard and a stack check for shared Logic code (Adaptive Limiter meters, found with Codex); verified with a real capture of Adaptive Limiter. · done 2026-11-14
 
 - [x] **BL-21** `P2 · Medium` **Update notice and one-click update from GitHub:** on launch the app checks the latest GitHub release; if newer, a bar offers Update Now (download, verify our Developer ID signature, replace, relaunch), What's New and Later. Fails silently; never touches the theme. Also BrightMeUp > Check for Updates... in the menu, which always answers. Every release goes to GitHub with BrightMeUp.dmg and BrightMeUp.zip. Adi asked 2026-11-14. Published as v1.3.2. · done 2026-11-14
 
