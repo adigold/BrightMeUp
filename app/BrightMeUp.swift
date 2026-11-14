@@ -1052,6 +1052,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
    }
 }
 
+// tools/readme-gif builds the views without the app entry point.
+#if !GIF_RENDER
 @main
 struct LauncherApp: App {
    @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
@@ -1064,3 +1066,4 @@ struct LauncherApp: App {
       .defaultSize(width: 1180, height: 860)
    }
 }
+#endif

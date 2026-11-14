@@ -15,9 +15,12 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
 
 ## Done
+
+- [x] **BL-9** `P2 · Medium` **Animated GIF for the README:** an eye-catching animated GIF at the top of the GitHub README showing BrightMeUp turning Logic Pro light, the previews and presets. Adi asked 2026-11-14. docs/brightmeup.gif (13 s loop, 5.2 MB), rebuilt with tools/readme-gif/build.sh. · done 2026-11-14
 
 - [x] **BL-8** `P1 · Medium` **Revert to Logic Defaults button:** a big button at the top right that asks "Are you sure?" and then restarts Logic Pro in its original look, without BrightMeUp. Adi asked 2026-11-14. Shipped as 1.2.3. · done 2026-11-14
 
