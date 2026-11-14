@@ -204,7 +204,7 @@ struct MockPianoRoll: View {
                .frame(width: beatWidth * 4, alignment: .leading)
          }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
       .background(theme.gray(STOCK_RULER))
       .clipped()
    }
@@ -256,7 +256,7 @@ struct MockPianoRoll: View {
                .offset(x: note.1 * beatWidth + 1, y: Double(note.0) * rowHeight)
          }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
+      .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
       .clipped()
    }
 }

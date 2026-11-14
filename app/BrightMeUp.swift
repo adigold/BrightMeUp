@@ -654,9 +654,11 @@ struct ContentView: View {
                .frame(width: 150)
                .help("Before shows stock Logic Pro. After shows your theme.")
             }
+            // minWidth 0 and clipped keep a wide drawing from pushing the page wider than the window.
             previewView
-               .frame(maxWidth: .infinity)
+               .frame(minWidth: 0, maxWidth: .infinity)
                .frame(height: PREVIEW_HEIGHT)
+               .clipped()
             Text(showsStock ? "Before: stock Logic Pro" : previewCaption)
                .font(.caption)
                .foregroundStyle(.secondary)

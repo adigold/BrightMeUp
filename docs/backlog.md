@@ -12,9 +12,12 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
 
 ## Done
+
+- [x] **BL-6** `P1 · High` **Preview overflows the window:** the Piano Roll preview pushed the page wider than a small window, so content went off the left edge. Make every preview fit any window size. Adi reported 2026-11-14. Fixed in 1.2.1; all five previews checked at the smallest window size. · done 2026-11-14
 
 - [x] **BL-5** `P1 · Medium` **Resizable window and area previews:** let the app window resize and go full screen, and add live previews for the Mixer, Piano Roll, a plug-in and the main window (control bar and inspector), switching the preview to the area being edited. Adi asked 2026-11-14. Shipped as 1.2.0, with the copyright line changed to InPlug/AGsoundtrax LLC. · done 2026-11-14
 
