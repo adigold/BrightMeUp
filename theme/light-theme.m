@@ -421,6 +421,8 @@ static NSString *const PLUGIN_CONTROLLER_CLASSES[] = { @"LgPluginWindowControlle
  * @param window NSWindow * - the window
  * @return BOOL - true for a plug-in window
  */
+static BOOL isLogicWindow(NSWindow *window);
+
 static BOOL isPluginWindow(NSWindow *window) {
    for (NSWindow *w = window; w; w = w.parentWindow) {
       for (size_t i = 0; i < sizeof(PLUGIN_WINDOW_CLASSES) / sizeof(PLUGIN_WINDOW_CLASSES[0]); i++) {
@@ -492,9 +494,9 @@ static BOOL shouldSkip(void) {
    return isRealtimeThread() || isPluginDrawing();
 }
 
-// Set while the main thread draws a view of a plug-in window. This catches views that draw with
-// a light appearance of their own, so the window decides, not the appearance (Adi, 2026-11-14:
-// Adaptive Limiter meters).
+// Set while the main thread draws a view that must stay stock: a view of plug-in code, or any view
+// of a window that is not surely Logic Pro. The window decides, not the appearance (Adi,
+// 2026-11-14: Adaptive Limiter meters, then color only what is surely Logic).
 static __thread int pluginDrawDepth = 0;
 
 static BOOL isPluginDrawing(void) {
@@ -1301,7 +1303,7 @@ static id hookNibDecode(NSCoder *decoder, SEL sel, NSString *key) {
 static void hookFieldBackground(NSTextField *field, SEL sel, NSColor *color) {
    NSColor *mapped = color;
 
-   if (!shouldSkip() && isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !isPluginWindow(field.window)) {
+   if (!shouldSkip() && isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !isPluginWindow(field.window) && (!field.window || isLogicWindow(field.window))) {
       mapped = mappedGrayColor(color, FIELD_DARK_MAX);
    }
 
@@ -1327,7 +1329,7 @@ static id __attribute__((ns_returns_retained)) hookAppearanceDecode(__attribute_
 
 // AppKit blends the header with plus darker under VibrantLight, which paints a black bar.
 static void hookHeaderDraw(NSView *view, SEL sel, NSRect rect) {
-   if (!shouldSkip() && view.appearance != trueAqua && !isPluginWindow(view.window)) {
+   if (!shouldSkip() && view.appearance != trueAqua && isLogicWindow(view.window)) {
       view.appearance = trueAqua;
    }
    ((void (*)(id, SEL, NSRect))origHeaderDraw)(view, sel, rect);
@@ -1370,7 +1372,7 @@ static void hookToolbarImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect
 
 // Inactive windows draw these buttons without the colored fill.
 static void hookButtonImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect frame, NSButton *view) {
-   BOOL isButton = !shouldSkip() && [view isKindOfClass:[NSButton class]] && view.window.isMainWindow && !isPluginWindow(view.window);
+   BOOL isButton = !shouldSkip() && [view isKindOfClass:[NSButton class]] && view.window.isMainWindow && isLogicWindow(view.window);
    BOOL isActive = isButton && cell.state == NSControlStateValueOn && isColored(view.bezelColor);
 
    ((void (*)(id, SEL, NSImage *, NSRect, NSView *))origButtonImage)(cell, sel, isActive ? whiteGlyph(image) : image, frame, view);
@@ -1408,33 +1410,119 @@ static void hookViewMoved(NSView *view, SEL sel) {
 
 static IMP origDrawRectClip, origDrawLayer, origDrawBackingLayer;
 
-// True when this draw call belongs to a plug-in window. Only the main thread draws views here.
+static CFMutableDictionaryRef classKinds;
+
+// 1 for code of Logic Pro itself or of macOS, 2 for plug-in code or any other code.
+static int imageKind(Class cls) {
+   const char *path = NULL;
+
+   // Key-value observing adds a subclass with no image; it counts as the observed class. Any
+   // other class without an image is unknown, so it stays stock.
+   while (cls && !(path = class_getImageName(cls)) && strncmp(class_getName(cls), "NSKVONotifying_", 15) == 0) {
+      cls = class_getSuperclass(cls);
+   }
+
+   if (!path) {
+      return 2;
+   }
+   for (size_t i = 0; i < sizeof(PLUGIN_PATHS) / sizeof(PLUGIN_PATHS[0]); i++) {
+      if (strstr(path, PLUGIN_PATHS[i])) {
+         return 2;
+      }
+   }
+   return strstr(path, "/Logic Pro.app/") || strncmp(path, "/System/Library/", 16) == 0 ? 1 : 2;
+}
+
+// The same answer per class, kept on the main thread.
+static int classKind(Class cls) {
+   if (!classKinds) {
+      classKinds = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
+   }
+   intptr_t kind = (intptr_t)CFDictionaryGetValue(classKinds, (__bridge const void *)cls);
+
+   if (!kind) {
+      kind = imageKind(cls);
+      CFDictionaryAddValue(classKinds, (__bridge const void *)cls, (const void *)kind);
+   }
+   return (int)kind;
+}
+
+/**
+ * Reports if the theme may color a window: only a window that Logic Pro itself shows. A plug-in
+ * window, a window of plug-in code and any window the theme cannot place stay stock (Adi,
+ * 2026-11-14: color only what is surely Logic).
+ *
+ * @param window NSWindow * - the window
+ * @return BOOL - true for a Logic Pro window
+ */
+static BOOL isLogicWindow(NSWindow *window) {
+   BOOL result;
+
+   if (!window) {
+      return NO;
+   }
+   // Checked at every draw, because a window can get a new controller or content later.
+   result = !isPluginWindow(window);
+   for (NSWindow *w = window; result && w; w = w.parentWindow) {
+      result = classKind(object_getClass(w)) == 1 && (!w.windowController || classKind(object_getClass(w.windowController)) == 1)
+         && (!w.delegate || classKind(object_getClass(w.delegate)) == 1) && (!w.contentView || classKind(object_getClass(w.contentView)) == 1)
+         && (!w.contentViewController || classKind(object_getClass(w.contentViewController)) == 1);
+   }
+   return result;
+}
+
+// True when a view must draw stock: it is plug-in code, or its window is not surely Logic Pro.
+// Only the main thread draws views here.
 static BOOL isDrawingPluginView(NSView *view) {
-   return pthread_main_np() && atomic_load_explicit(&hasPluginWindow, memory_order_acquire) && isPluginWindow(view.window);
+   if (!pthread_main_np()) {
+      return NO;
+   }
+   // A view of macOS can sit inside a plug-in's own view, so every view above it counts too.
+   for (NSView *v = view; v; v = v.superview) {
+      if (classKind(object_getClass(v)) != 1) {
+         return YES;
+      }
+   }
+   return !isLogicWindow(view.window);
 }
 
 static void hookDrawRectClip(NSView *view, SEL sel, NSRect rect, BOOL clip) {
-   BOOL isPlugin = isDrawingPluginView(view);
+   int saved = pluginDrawDepth;
 
-   pluginDrawDepth += isPlugin;
-   ((void (*)(id, SEL, NSRect, BOOL))origDrawRectClip)(view, sel, rect, clip);
-   pluginDrawDepth -= isPlugin;
+   // Stock while the check runs, then stock for the whole draw if the view is not surely Logic.
+   pluginDrawDepth = saved + 1;
+   @try {
+      pluginDrawDepth = saved + (isDrawingPluginView(view) ? 1 : 0);
+      ((void (*)(id, SEL, NSRect, BOOL))origDrawRectClip)(view, sel, rect, clip);
+   } @finally {
+      pluginDrawDepth = saved;
+   }
 }
 
 static void hookDrawLayer(NSView *view, SEL sel, CALayer *layer, CGContextRef ctx) {
-   BOOL isPlugin = isDrawingPluginView(view);
+   int saved = pluginDrawDepth;
 
-   pluginDrawDepth += isPlugin;
-   ((void (*)(id, SEL, CALayer *, CGContextRef))origDrawLayer)(view, sel, layer, ctx);
-   pluginDrawDepth -= isPlugin;
+   // Stock while the check runs, then stock for the whole draw if the view is not surely Logic.
+   pluginDrawDepth = saved + 1;
+   @try {
+      pluginDrawDepth = saved + (isDrawingPluginView(view) ? 1 : 0);
+      ((void (*)(id, SEL, CALayer *, CGContextRef))origDrawLayer)(view, sel, layer, ctx);
+   } @finally {
+      pluginDrawDepth = saved;
+   }
 }
 
 static void hookDrawBackingLayer(NSView *view, SEL sel, CALayer *layer, CGContextRef ctx, id handler) {
-   BOOL isPlugin = isDrawingPluginView(view);
+   int saved = pluginDrawDepth;
 
-   pluginDrawDepth += isPlugin;
-   ((void (*)(id, SEL, CALayer *, CGContextRef, id))origDrawBackingLayer)(view, sel, layer, ctx, handler);
-   pluginDrawDepth -= isPlugin;
+   // Stock while the check runs, then stock for the whole draw if the view is not surely Logic.
+   pluginDrawDepth = saved + 1;
+   @try {
+      pluginDrawDepth = saved + (isDrawingPluginView(view) ? 1 : 0);
+      ((void (*)(id, SEL, CALayer *, CGContextRef, id))origDrawBackingLayer)(view, sel, layer, ctx, handler);
+   } @finally {
+      pluginDrawDepth = saved;
+   }
 }
 
 static void hookViewSetAppearance(NSView *view, SEL sel, NSAppearance *appearance) {
@@ -1456,7 +1544,7 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
          window.appearance = trueDarkAqua;
       }
       restorePluginAppearance(window.contentView.superview ?: window.contentView);
-   } else if (surfaceMax < 1 && place != NSWindowOut && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
+   } else if (surfaceMax < 1 && place != NSWindowOut && isLogicWindow(window) && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
       window.titlebarAppearsTransparent = YES;
       if ([window.backgroundColor isEqual:NSColor.windowBackgroundColor]) {
          window.backgroundColor = [NSColor colorNamed:@"BackgroundViewControlbar"];
@@ -1470,7 +1558,7 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
 static NSColor *hookClipBackground(NSClipView *view, SEL sel) {
    NSColor *color = ((NSColor *(*)(id, SEL))origClipBackground)(view, sel);
 
-   if (shouldSkip() || isPluginWindow(view.window)) {
+   if (shouldSkip() || !isLogicWindow(view.window)) {
       return color;
    }
    return [color isEqual:NSColor.controlBackgroundColor] ? scaledControlBackground : color;
@@ -1483,7 +1571,7 @@ static NSColor *hookClipBackground(NSClipView *view, SEL sel) {
 static void hookPlatterLayout(NSView *platter, SEL sel) {
    NSView *glass = platter.superview.superview;
 
-   if (isRealtimeThread() || isPluginWindow(platter.window)) {
+   if (isRealtimeThread() || !isLogicWindow(platter.window)) {
       ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
       return;
    }
@@ -1841,7 +1929,9 @@ __attribute__((constructor)) static void start(void) {
    if (class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawRect:clip:"))) {
       origDrawRectClip = method_setImplementation(class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawRect:clip:")), (IMP)hookDrawRectClip);
    }
-   origDrawLayer = method_setImplementation(class_getInstanceMethod([NSView class], @selector(drawLayer:inContext:)), (IMP)hookDrawLayer);
+   if (class_getInstanceMethod([NSView class], @selector(drawLayer:inContext:))) {
+      origDrawLayer = method_setImplementation(class_getInstanceMethod([NSView class], @selector(drawLayer:inContext:)), (IMP)hookDrawLayer);
+   }
    if (class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawViewBackingLayer:inContext:drawingHandler:"))) {
       origDrawBackingLayer = method_setImplementation(class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawViewBackingLayer:inContext:drawingHandler:")), (IMP)hookDrawBackingLayer);
    }

@@ -91,6 +91,11 @@ static void *realtimeThread(void *unused) {
    return NULL;
 }
 
+@interface ThemeTestView : NSView
+@end
+@implementation ThemeTestView
+@end
+
 static void testSafety(void) {
    pthread_t thread;
 
@@ -100,6 +105,15 @@ static void testSafety(void) {
    pthread_create(&thread, NULL, realtimeThread, NULL);
    pthread_join(thread, NULL);
    check(realtimeResult, "a real-time (audio) thread is always skipped");
+   check(classKind([NSView class]) == 1, "a view class of macOS counts as safe to color");
+   check(classKind(objc_allocateClassPair([NSView class], "BMURuntimeView", 0)) == 2, "a run-time class with no image stays stock");
+   check(classKind([ThemeTestView class]) == 2, "a view class from any other code (like a plug-in) stays stock");
+   check(!isLogicWindow(nil), "a view with no window stays stock");
+   check(isDrawingPluginView([[ThemeTestView alloc] init]), "a plug-in view always draws stock");
+   NSView *host = [[ThemeTestView alloc] init], *child = [[NSView alloc] init];
+   [host addSubview:child];
+   check(isDrawingPluginView(child), "a macOS view inside a plug-in view draws stock");
+   check(isDrawingPluginView([[NSView alloc] init]), "a view with no window draws stock");
 }
 
 static void testFieldColors(void) {

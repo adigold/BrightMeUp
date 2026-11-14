@@ -24,6 +24,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 ## Now
 
+- [~] **BL-23** `P0 · Urgent` **Allowlist: color only Logic's own windows (1.3.6):** while drawing, the theme acts only in windows it can confirm belong to Logic itself (not plug-in windows, not windows or views from plug-in code, not unknown windows). Everything else stays stock. Suggested by Codex. Adi asked 2026-11-14.
+
 
 - [~] **BL-18** `P1 · High` **Null test:** prove the audio is identical with and without BrightMeUp by comparing two bounces sample by sample. Adi asked 2026-11-14. tools/null-test.sh written and self-tested; needs two bounces of the same project (stock and BrightMeUp).
 
