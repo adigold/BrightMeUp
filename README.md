@@ -4,7 +4,7 @@
   <img src="docs/brightmeup.gif" width="960" alt="BrightMeUp turns Logic Pro from dark to bright, with presets and settings for each part of Logic Pro">
 </p>
 
-BrightMeUp is based on [BrightMeUp](https://github.com/karlingen/i-see-logic-pro) by Karl Metum (MIT license).
+BrightMeUp is based on [I See Logic Pro](https://github.com/karlingen/i-see-logic-pro) by Karl Metum (MIT license).
 
 A customizable light theme for Logic Pro 13. Logic Pro has only a dark interface. This project changes its colors to light colors while Logic Pro runs.
 
