@@ -117,9 +117,7 @@ app/build.sh
 
 The app appears at `app/BrightMeUp.app`. To sign it for other Macs, set `SIGN_ID` to your own Developer ID certificate before you build.
 
-## Credits
-
-BrightMeUp is based on [I See Logic Pro](https://github.com/karlingen/i-see-logic-pro) by Karl Metum, under the MIT license. See [LICENSE](LICENSE).
+## About
 
 BrightMeUp is not made by Apple, and Apple does not support it. Logic Pro is a trademark of Apple Inc.
 

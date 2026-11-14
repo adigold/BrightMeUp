@@ -22,6 +22,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 ## Done
 
+- [x] **BL-12** `P3 · Low` **Remove the Credits line from the README:** Adi asked 2026-11-14. The LICENSE file keeps the original copyright notice, which the MIT license requires. · done 2026-11-14
+
 - [x] **BL-11** `P2 · Medium` **Drag-and-drop DMG installer:** a beautiful DMG like InPlug's (custom background, big icons, arrow to Applications), signed and notarized. Adi asked 2026-11-14. tools/dmg/build.sh makes dist/BrightMeUp.dmg (sunrise background, "Drag it in. Brighten up."), notarized, attached to v1.2.3; README button now downloads the DMG. CLAUDE.md taken off GitHub (kept locally). · done 2026-11-14
 
 - [x] **BL-10** `P1 · High` **Clean the README and push to GitHub:** rewrite the README to describe results only (no internals), replace the old launcher screenshot, then push to github.com/adigold/BrightMeUp. Adi asked 2026-11-14. README rewritten like CST-Convertor (Download for Mac button to releases/latest/download/BrightMeUp.zip), release v1.2.3 published. · done 2026-11-14
