@@ -9,9 +9,12 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 
+
 ## Now
 
 ## Done
+
+- [x] **BL-3** `P2 · Low` **Powered by InPlug.app footer:** a small "Powered by InPlug.app" line at the bottom of the app that opens https://inplug.app. Adi asked 2026-11-14. Shipped as 1.1.1. · done 2026-11-14
 
 - [x] **BL-2** `P1 · High` **Per-area control and many presets:** let the user set lightness and contrast separately for each part of Logic Pro (tracks, mixer, editors, inspector, browsers, control bar, windows), or keep a part dark, and ship a large preset library. Adi asked 2026-11-14. Shipped as 1.1.0: 8 areas (Overall / Custom / Original each), 30 presets in 6 groups, presets save areas. · done 2026-11-14
 

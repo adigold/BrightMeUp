@@ -661,6 +661,16 @@ struct ContentView: View {
                   .controlSize(.large)
                   .disabled(!status.canStart)
             }
+            HStack(spacing: 4) {
+               Spacer()
+               Text("Powered by")
+               Link("InPlug.app", destination: URL(string: "https://inplug.app")!)
+                  .foregroundStyle(.tint)
+                  .help("Open inplug.app")
+               Spacer()
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
          }
          .padding(20)
          .navigationTitle("BrightMeUp")
