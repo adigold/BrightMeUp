@@ -15,9 +15,6 @@
   <b>Tested only with Logic Pro 13. Earlier versions, such as Logic Pro 12, are not supported.</b>
 </p>
 
-<p align="center">
-  Built on <a href="https://github.com/karlingen/i-see-logic-pro">I See Logic Pro</a> by <a href="https://github.com/karlingen">Karl Metum</a>
-</p>
 
 <p align="center">
   <img src="docs/before-after.png" width="960" alt="Logic Pro in its stock dark look on the left, and with BrightMeUp on the right">
