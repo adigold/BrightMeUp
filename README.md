@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/icon.png" width="160" alt="BrightMeUp icon">
+  <img src="docs/app-icon.png" width="160" alt="BrightMeUp icon">
 </p>
 
 <h1 align="center">BrightMeUp</h1>
