@@ -1,4 +1,4 @@
-# The installer window, like InPlug's: a sunrise background with "Drag it in. Brighten up.",
+# The installer window: a warm white background with "Drag it in. Switch it on.",
 # big icons, BrightMeUp on the left, Applications on the right, an arrow between them, no toolbar.
 # Used by tools/dmg/build.sh: dmgbuild -s tools/dmg/settings.py -D app=... -D icon=... -D background=...
 import os.path

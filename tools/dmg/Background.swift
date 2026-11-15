@@ -1,52 +1,49 @@
-// Draws the background of the installer window: a night-to-sunrise sky, "Drag it in. Brighten up.",
-// and an arrow from the app to Applications. tools/dmg/build.sh renders it at 1x and 2x.
+// Draws the background of the installer window, in the style of the light switch icon: a warm
+// white backdrop, "Drag it in. Switch it on." with the second line on an orange switch track, and
+// an arrow from the app to Applications. tools/dmg/build.sh renders it at 1x and 2x.
 // The layout is 660 by 420 points inside a 660 by 545 window; the icons sit at (137, 245) and (523, 245), see settings.py.
 import AppKit
 import SwiftUI
 
 // Taller than the 420 point layout: when Finder shows its path and status bars they cover the
-// bottom, and when it hides them the extra sky fills the window.
+// bottom, and when it hides them the extra space fills the window.
 let SIZE = CGSize(width: 660, height: 545)
 let SUN = Color(red: 1, green: 0.66, blue: 0.16)
+let SUN_LIGHT = Color(red: 1, green: 0.82, blue: 0.36)
+let SUN_DEEP = Color(red: 1, green: 0.58, blue: 0.16)
+let INK = Color(red: 0.12, green: 0.11, blue: 0.13)
 
 struct Background: View {
    var body: some View {
       ZStack(alignment: .topLeading) {
-         // The sky brightens from the left (Logic Pro dark) to the right (BrightMeUp light).
-         LinearGradient(stops: [
-            .init(color: Color(red: 0.07, green: 0.06, blue: 0.13), location: 0),
-            .init(color: Color(red: 0.22, green: 0.13, blue: 0.26), location: 0.42),
-            .init(color: Color(red: 0.72, green: 0.33, blue: 0.24), location: 0.78),
-            .init(color: Color(red: 0.98, green: 0.62, blue: 0.3), location: 1),
-         ], startPoint: .leading, endPoint: .trailing)
-         // A low sun glows behind Applications.
-         RadialGradient(colors: [ Color(red: 1, green: 0.85, blue: 0.5).opacity(0.85), SUN.opacity(0.35), .clear ],
-            center: UnitPoint(x: 523 / SIZE.width, y: 250 / SIZE.height), startRadius: 4, endRadius: 230)
-         // A few stars on the dark side.
-         ForEach(0..<14, id: \.self) { (i) in
-            let x = Double((i * 73) % 240) + 18
-            let y = Double((i * 151) % 160) + 150
-
-            Circle().fill(.white.opacity(0.18 + Double(i % 4) * 0.12))
-               .frame(width: i % 5 == 0 ? 3 : 2, height: i % 5 == 0 ? 3 : 2)
-               .offset(x: x, y: y)
-         }
-         VStack(alignment: .leading, spacing: 2) {
+         LinearGradient(colors: [ Color(red: 1, green: 0.99, blue: 0.97), Color(red: 0.95, green: 0.93, blue: 0.9) ],
+            startPoint: .top, endPoint: .bottom)
+         // A soft warm light behind Applications, where the app goes.
+         RadialGradient(colors: [ SUN_LIGHT.opacity(0.45), SUN.opacity(0.12), .clear ],
+            center: UnitPoint(x: 523 / SIZE.width, y: 250 / SIZE.height), startRadius: 4, endRadius: 200)
+         VStack(alignment: .leading, spacing: 8) {
             Text("Drag it in.")
                .font(.system(size: 46, weight: .black, design: .rounded))
-               .foregroundStyle(.white)
-            Text("Brighten up.")
-               .font(.system(size: 46, weight: .black, design: .rounded))
-               .foregroundStyle(Color(red: 0.1, green: 0.07, blue: 0.12))
-               .padding(.horizontal, 8)
-               .background(SUN, in: RoundedRectangle(cornerRadius: 6))
-               .padding(.leading, -8)
+               .foregroundStyle(INK)
+            // The second line sits on a switch track with its knob on the right, like the icon.
+            HStack(spacing: 14) {
+               Text("Switch it on.")
+                  .font(.system(size: 40, weight: .black, design: .rounded))
+                  .foregroundStyle(.white)
+               Circle().fill(.white).frame(width: 46, height: 46)
+                  .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
+            }
+            .padding(.leading, 26)
+            .padding(.trailing, 6)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(LinearGradient(colors: [ SUN_LIGHT, SUN_DEEP ], startPoint: .top, endPoint: .bottom)))
+            .shadow(color: SUN.opacity(0.35), radius: 10, y: 4)
          }
          .offset(x: 34, y: 22)
          arrow
          Text("Then open BrightMeUp from Applications")
             .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.9))
+            .foregroundStyle(INK.opacity(0.6))
             .frame(width: SIZE.width)
             .offset(y: 384)
       }
@@ -68,7 +65,7 @@ struct Background: View {
          }
          .stroke(SUN, style: StrokeStyle(lineWidth: 9, lineCap: .round, lineJoin: .round))
       }
-      .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+      .shadow(color: SUN.opacity(0.3), radius: 6, y: 3)
    }
 }
 

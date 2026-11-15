@@ -16,12 +16,7 @@
 </p>
 
 <p align="center">
-  Powered by <a href="https://inplug.app">InPlug.app</a><br>
   Built on <a href="https://github.com/karlingen/i-see-logic-pro">I See Logic Pro</a> by <a href="https://github.com/karlingen">Karl Metum</a>
-</p>
-
-<p align="center">
-  <img src="docs/brightmeup.gif" width="960" alt="BrightMeUp turns Logic Pro from dark to bright, with presets and settings for each part of Logic Pro">
 </p>
 
 <p align="center">
@@ -52,15 +47,13 @@ You need Logic Pro 13.0, a Mac with Apple silicon, and macOS 26. A zip version o
 
 ## Make it yours
 
-![The BrightMeUp app](docs/app.png)
+**Brightness** sets how light the backgrounds are. At 100% they are white, and lower values give a softer gray.
 
-**Lightness** sets how light the backgrounds are. At 100% they are white, and lower values give a softer gray.
-
-**Middle grays** sets how much the buttons, lines and controls stand out. Move it up for more contrast.
+**Contrast** sets how much the buttons, lines and controls stand out. Move it up for more contrast.
 
 In the **Areas** tab, give one part of Logic Pro its own look, or keep it in the original dark. Track and region colors always stay as they are.
 
-Press **Command S** to save the current look as a preset, and **Command 0** to go back to the default Light look.
+Press **Command S** to save the current look as a preset, and **Command 0** to go back to the default Clear look.
 
 ### Share a look
 
@@ -113,5 +106,3 @@ The app is built at `app/BrightMeUp.app`. Set `SIGN_ID` to your own Developer ID
 BrightMeUp builds on [I See Logic Pro](https://github.com/karlingen/i-see-logic-pro) by [Karl Metum](https://github.com/karlingen), an open source project under the MIT license. Thank you, Karl.
 
 BrightMeUp is not made by Apple, and Apple does not support it. Logic Pro is a trademark of Apple Inc. See [LICENSE](LICENSE) for the license.
-
-© 2026 InPlug/AGsoundtrax LLC, All rights reserved.

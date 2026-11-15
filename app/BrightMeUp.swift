@@ -81,22 +81,22 @@ struct Preset: Identifiable {
 let PRESET_GROUPS = [ "Bright", "Balanced", "Dim", "High contrast", "Low contrast", "By area" ]
 
 let PRESETS = [
-   Preset(name: "Light", group: "Bright", summary: "Default", surfaceMax: SURFACE_MAX_DEFAULT, gamma: GAMMA_DEFAULT),
+   Preset(name: "Clear", group: "Bright", summary: "Default", surfaceMax: SURFACE_MAX_DEFAULT, gamma: GAMMA_DEFAULT),
    Preset(name: "Paper", group: "Bright", summary: "Bright, airy", surfaceMax: 0.97, gamma: 0.55),
    Preset(name: "Snow", group: "Bright", summary: "Whitest grays", surfaceMax: 1, gamma: 0.45),
    Preset(name: "Daylight", group: "Bright", summary: "Bright room", surfaceMax: 1, gamma: 0.62),
    Preset(name: "Morning", group: "Bright", summary: "Bright, a bit softer", surfaceMax: 0.94, gamma: 0.7),
-   Preset(name: "Soft", group: "Balanced", summary: "Dimmer grays", surfaceMax: 0.85, gamma: 0.85),
+   Preset(name: "Velvet", group: "Balanced", summary: "Dimmer grays", surfaceMax: 0.85, gamma: 0.85),
    Preset(name: "Linen", group: "Balanced", summary: "Light, calm", surfaceMax: 0.9, gamma: 0.8),
-   Preset(name: "Mist", group: "Balanced", summary: "Light, flat", surfaceMax: 0.88, gamma: 0.65),
+   Preset(name: "Pearl", group: "Balanced", summary: "Light, flat", surfaceMax: 0.88, gamma: 0.65),
    Preset(name: "Studio", group: "Balanced", summary: "Long sessions", surfaceMax: 0.76, gamma: 1.1),
    Preset(name: "Slate", group: "Balanced", summary: "Deeper grays", surfaceMax: 0.8, gamma: 1.2),
-   Preset(name: "Gray", group: "Balanced", summary: "Middle gray", surfaceMax: 0.68, gamma: 1),
+   Preset(name: "Stone", group: "Balanced", summary: "Middle gray", surfaceMax: 0.68, gamma: 1),
    Preset(name: "Dusk", group: "Dim", summary: "Dim", surfaceMax: 0.56, gamma: 1.35),
    Preset(name: "Evening", group: "Dim", summary: "Late sessions", surfaceMax: 0.62, gamma: 1.2),
    Preset(name: "Twilight", group: "Dim", summary: "Dimmer", surfaceMax: 0.53, gamma: 1.5),
    Preset(name: "Night Light", group: "Dim", summary: "Darkest", surfaceMax: 0.5, gamma: 1.8),
-   Preset(name: "Contrast", group: "High contrast", summary: "Strong separation", surfaceMax: 1, gamma: 1.4),
+   Preset(name: "Crisp", group: "High contrast", summary: "Strong separation", surfaceMax: 1, gamma: 1.4),
    Preset(name: "Bold", group: "High contrast", summary: "Darker controls", surfaceMax: 0.92, gamma: 1.6),
    Preset(name: "Ink", group: "High contrast", summary: "Maximum contrast", surfaceMax: 0.96, gamma: 2),
    Preset(name: "Gentle", group: "Low contrast", summary: "Soft edges", surfaceMax: 0.92, gamma: 0.45),
@@ -745,7 +745,7 @@ struct ContentView: View {
                }
                .keyboardShortcut("0", modifiers: .command)
                .disabled(isDefault)
-               .help("Back to the default Light values for everything (Command 0)")
+               .help("Back to the default Clear look for everything (Command 0)")
                Button {
                   newName = presetName == CUSTOM ? "" : presetName
                   isNaming = true
@@ -773,9 +773,9 @@ struct ContentView: View {
                areaList
             } else {
                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 12) {
-                  sliderRow("Lightness", value: $surfaceMax, range: SURFACE_RANGE, low: "Dark", high: "Light",
+                  sliderRow("Brightness", value: $surfaceMax, range: SURFACE_RANGE, low: "Dark", high: "Light",
                      shown: percent(surfaceMax), step: 0.01, defaultValue: SURFACE_MAX_DEFAULT)
-                  sliderRow("Middle grays", value: $gamma, range: GAMMA_RANGE, low: "Light", high: "Dark",
+                  sliderRow("Contrast", value: $gamma, range: GAMMA_RANGE, low: "Low", high: "High",
                      shown: String(format: "%.2f", gamma), step: 0.05, defaultValue: GAMMA_DEFAULT)
                }
                Text("These values apply to every area that follows Overall. Use Areas to change one part of Logic Pro on its own.")
@@ -797,18 +797,14 @@ struct ContentView: View {
                   .controlSize(.large)
                   .disabled(!status.canStart)
             }
-            VStack(spacing: 3) {
-               HStack(spacing: 5) {
-                  Text("Powered by")
-                  Link("InPlug.app", destination: URL(string: "https://inplug.app")!)
-                     .fontWeight(.semibold)
-                     .foregroundStyle(.tint)
-                     .help("Open inplug.app")
-               }
-               .font(.body)
-               Text("© \(String(Calendar.current.component(.year, from: Date()))) InPlug/AGsoundtrax LLC, All rights reserved.")
-                  .font(.caption)
+            HStack(spacing: 5) {
+               Text("Built on")
+               Link("I See Logic Pro", destination: URL(string: "https://github.com/karlingen/i-see-logic-pro")!)
+                  .fontWeight(.semibold)
+                  .foregroundStyle(.tint)
+               Text("by Karl Metum")
             }
+            .font(.caption)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity)
          }
@@ -948,9 +944,9 @@ struct ContentView: View {
          }
          if isCustom {
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
-               sliderRow("Lightness", value: lightest, range: SURFACE_RANGE, low: "Dark", high: "Light",
+               sliderRow("Brightness", value: lightest, range: SURFACE_RANGE, low: "Dark", high: "Light",
                   shown: percent(value.surfaceMax), step: 0.01, defaultValue: surfaceMax)
-               sliderRow("Middle grays", value: curve, range: GAMMA_RANGE, low: "Light", high: "Dark",
+               sliderRow("Contrast", value: curve, range: GAMMA_RANGE, low: "Low", high: "High",
                   shown: String(format: "%.2f", value.gamma), step: 0.05, defaultValue: gamma)
             }
             .controlSize(.small)
