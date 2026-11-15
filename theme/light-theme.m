@@ -1397,7 +1397,7 @@ static BOOL hasColoredPixels(NSImage *image) {
 static void hookToolbarImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect frame, NSView *view) {
    // In the dark control bar, Logic's symbol glyphs carry the color they got when they were made,
    // which is the light theme's dark gray. As template images, macOS tints them for the dark look.
-   if (pthread_main_np() && isInDarkControlBar(view) && image && !image.isTemplate) {
+   if (image && !image.isTemplate && isInDarkControlBar(view)) {
       NSImage *glyph = objc_getAssociatedObject(image, &originalKey);
 
       if (!glyph) {
@@ -1539,11 +1539,19 @@ static BOOL isLogicBundleClass(Class cls) {
    return path && strstr(path, "/Logic Pro.app/") && classKind(cls) == 1;
 }
 
+// A window that Logic Pro's own code shows: never a plug-in window, even one built only from
+// macOS classes. Main thread only.
+static BOOL isLogicOwnedWindow(NSWindow *window) {
+   return pthread_main_np() && window && !isPluginWindow(window)
+      && (isLogicBundleClass(object_getClass(window)) || isLogicBundleClass(object_getClass(window.windowController)))
+      && isLogicWindow(window);
+}
+
 // A view inside the dark title bar of a Logic window draws stock.
 static BOOL isInDarkControlBar(NSView *view) {
    Class container = objc_getClass("NSTitlebarContainerView");
 
-   if (!isControlBarOriginal() || !container || !trueDarkAqua) {
+   if (!isControlBarOriginal() || !container || !trueDarkAqua || !isLogicOwnedWindow(view.window)) {
       return NO;
    }
    for (NSView *v = view; v; v = v.superview) {
@@ -1644,9 +1652,7 @@ static void darkenToolbarViews(NSView *view, int depth) {
 static void darkenControlBar(NSWindow *window) {
    Class container = objc_getClass("NSTitlebarContainerView");
 
-   if (!pthread_main_np() || !isControlBarOriginal() || !trueDarkAqua || !container || !window || isPluginWindow(window)
-      || !(isLogicBundleClass(object_getClass(window)) || isLogicBundleClass(object_getClass(window.windowController)))
-      || !isLogicWindow(window)) {
+   if (!isControlBarOriginal() || !trueDarkAqua || !container || !isLogicOwnedWindow(window)) {
       return;
    }
    for (NSView *view in window.contentView.superview.subviews) {
