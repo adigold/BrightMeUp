@@ -6,8 +6,6 @@ Layout (2026-10-13): `- [ ]` open in **Inbox**, `- [~]` in progress in **Now**, 
 After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--start BL-n` when work begins, `--done BL-n` when it is finished, `--drop BL-n "why"` to drop it.
 
 ## Inbox
-- [ ] **BL-25** `P2 · Medium` **Share presets as files:** Export a saved preset to a file and Load Preset from a file, so users can send each other presets (Adi, 2026-11-15, after the forum thread).
-- [ ] **BL-24** `P1 · High` **Control bar Original mode stays light:** a forum user (macOS 27.2) reports that with the Dark Control Bar preset, or any Original/dark setting for the control bar, the control bar is still bright after a restart. Likely cause: only the Logic catalog colors follow the area setting, while the macOS title bar glass and toolbar platters stay light in Aqua. Fix so the control bar area in Original mode looks stock dark, and test it with a real capture.
 
 
 
@@ -33,6 +31,8 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 ## Done
+- [x] **BL-25** `P2 · Medium` **Share presets as files:** Export a saved preset to a file and Load Preset from a file, so users can send each other presets (Adi, 2026-11-15, after the forum thread). · done 2026-11-15 (1.3.7)
+- [x] **BL-24** `P1 · High` **Control bar Original mode stays light:** a forum user (macOS 27.2) reports that with the Dark Control Bar preset, or any Original/dark setting for the control bar, the control bar is still bright after a restart. Likely cause: only the Logic catalog colors follow the area setting, while the macOS title bar glass and toolbar platters stay light in Aqua. Fix so the control bar area in Original mode looks stock dark, and test it with a real capture. · done 2026-11-15 (1.3.7)
 
 - [x] **BL-23** `P0 · Urgent` **Allowlist: color only Logic's own windows (1.3.6):** while drawing, the theme acts only in windows it can confirm belong to Logic itself (not plug-in windows, not windows or views from plug-in code, not unknown windows). Everything else stays stock. Suggested by Codex. Adi asked 2026-11-14. Main window render identical to 1.3.5; plug-in windows not yet machine-tested (test project had no plug-ins). Published as v1.3.6. · done 2026-11-14
 
