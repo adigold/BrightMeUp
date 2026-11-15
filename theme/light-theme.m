@@ -1473,6 +1473,36 @@ static BOOL isLogicWindow(NSWindow *window) {
 
 // True when a view must draw stock: it is plug-in code, or its window is not surely Logic Pro.
 // Only the main thread draws views here.
+// The control bar set to Original keeps the stock dark look (BL-24). Logic's own control bar
+// colors follow the area setting, but the title bar glass and toolbar platters come from macOS
+// and follow the appearance, so the title bar of Logic's own windows gets the real dark appearance
+// back, and everything drawn inside it draws stock.
+static BOOL isControlBarOriginal(void) {
+   return areaSettings[AREA_CONTROL_BAR].mode == AREA_MODE_ORIGINAL;
+}
+
+// True only for a class from the Logic Pro bundle itself, never from a plug-in or macOS.
+static BOOL isLogicBundleClass(Class cls) {
+   const char *path = cls ? class_getImageName(cls) : NULL;
+
+   return path && strstr(path, "/Logic Pro.app/") && classKind(cls) == 1;
+}
+
+// A view inside the dark title bar of a Logic window draws stock.
+static BOOL isInDarkControlBar(NSView *view) {
+   Class container = objc_getClass("NSTitlebarContainerView");
+
+   if (!isControlBarOriginal() || !container || !trueDarkAqua) {
+      return NO;
+   }
+   for (NSView *v = view; v; v = v.superview) {
+      if ([v isKindOfClass:container]) {
+         return v.appearance == trueDarkAqua;
+      }
+   }
+   return NO;
+}
+
 static BOOL isDrawingPluginView(NSView *view) {
    if (!pthread_main_np()) {
       return NO;
@@ -1483,7 +1513,7 @@ static BOOL isDrawingPluginView(NSView *view) {
          return YES;
       }
    }
-   return !isLogicWindow(view.window);
+   return !isLogicWindow(view.window) || isInDarkControlBar(view);
 }
 
 static void hookDrawRectClip(NSView *view, SEL sel, NSRect rect, BOOL clip) {
@@ -1532,6 +1562,28 @@ static void hookViewSetAppearance(NSView *view, SEL sel, NSAppearance *appearanc
    ((void (*)(id, SEL, NSAppearance *))origViewSetAppearance)(view, sel, appearance);
 }
 
+/**
+ * Gives the title bar of a Logic Pro window the real dark appearance when the control bar is set
+ * to Original. Only a window that Logic Pro's own code shows qualifies, so a plug-in window, even
+ * one built only from macOS classes, is never changed. Main thread only, and safe to repeat.
+ *
+ * @param window NSWindow * - the window
+ */
+static void darkenControlBar(NSWindow *window) {
+   Class container = objc_getClass("NSTitlebarContainerView");
+
+   if (!pthread_main_np() || !isControlBarOriginal() || !trueDarkAqua || !container || !window || isPluginWindow(window)
+      || !(isLogicBundleClass(object_getClass(window)) || isLogicBundleClass(object_getClass(window.windowController)))
+      || !isLogicWindow(window)) {
+      return;
+   }
+   for (NSView *view in window.contentView.superview.subviews) {
+      if ([view isKindOfClass:container] && view.appearance != trueDarkAqua) {
+         view.appearance = trueDarkAqua;
+      }
+   }
+}
+
 static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode place, NSInteger other) {
    if (isRealtimeThread()) {
       ((void (*)(id, SEL, NSWindowOrderingMode, NSInteger))origOrderWindow)(window, sel, place, other);
@@ -1551,6 +1603,10 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
       }
    }
    ((void (*)(id, SEL, NSWindowOrderingMode, NSInteger))origOrderWindow)(window, sel, place, other);
+   // After ordering, so a title bar that macOS builds while showing the window is covered too.
+   if (place != NSWindowOut && isControlBarOriginal()) {
+      darkenControlBar(window);
+   }
 }
 
 // Legacy scroller tracks are transparent and show the clip view background. Some Logic scroll
@@ -1569,13 +1625,21 @@ static NSColor *hookClipBackground(NSClipView *view, SEL sel) {
 // above the platters renders all of them, so the opacity goes on that container. The buttons are
 // not inside it. A tint, or an opacity on a platter, does not change the lightness.
 static void hookPlatterLayout(NSView *platter, SEL sel) {
-   NSView *glass = platter.superview.superview;
+   NSView *glass;
 
-   if (isRealtimeThread() || !isLogicWindow(platter.window)) {
+   if (isRealtimeThread() || !pthread_main_np() || !isLogicWindow(platter.window)) {
       ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
       return;
    }
-   if ([glass isKindOfClass:objc_getClass("NSGlassContainerView")] && glass.alphaValue != PLATTER_ALPHA) {
+   glass = platter.superview.superview;
+   // A toolbar that macOS rebuilds, for example in full screen, gets the dark title bar again,
+   // and a dark title bar keeps its stock glass.
+   darkenControlBar(platter.window);
+   if (isInDarkControlBar(platter)) {
+      ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
+      return;
+   }
+   if (surfaceMax < 1 && [glass isKindOfClass:objc_getClass("NSGlassContainerView")] && glass.alphaValue != PLATTER_ALPHA) {
       glass.alphaValue = PLATTER_ALPHA;
    }
    ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
@@ -1940,9 +2004,9 @@ __attribute__((constructor)) static void start(void) {
    if (surfaceMax < 1) {
       scaledControlBackground = [NSColor colorWithSRGBRed:surfaceMax green:surfaceMax blue:surfaceMax alpha:1];
       origClipBackground = method_setImplementation(class_getInstanceMethod([NSClipView class], @selector(backgroundColor)), (IMP)hookClipBackground);
-      if (objc_getClass("NSToolbarPlatterView")) {
-         origPlatterLayout = method_setImplementation(class_getInstanceMethod(objc_getClass("NSToolbarPlatterView"), @selector(layout)), (IMP)hookPlatterLayout);
-      }
+   }
+   if ((surfaceMax < 1 || isControlBarOriginal()) && objc_getClass("NSToolbarPlatterView")) {
+      origPlatterLayout = method_setImplementation(class_getInstanceMethod(objc_getClass("NSToolbarPlatterView"), @selector(layout)), (IMP)hookPlatterLayout);
    }
    tooltip = objc_getClass("CTooltipView");
    origTooltipLabel = method_setImplementation(class_getInstanceMethod(tooltip, NSSelectorFromString(@"labelAttributes")), (IMP)hookTooltipLabel);
