@@ -1642,6 +1642,21 @@ static void darkenToolbarViews(NSView *view, int depth) {
    }
 }
 
+// Undoes the platter transparency in a title bar that turned dark after the glass was laid out.
+static void restoreGlassAlpha(NSView *view, int depth) {
+   Class glass = objc_getClass("NSGlassContainerView");
+
+   if (!glass || depth > 6) {
+      return;
+   }
+   for (NSView *child in view.subviews) {
+      if ([child isKindOfClass:glass] && child.alphaValue == PLATTER_ALPHA) {
+         child.alphaValue = 1;
+      }
+      restoreGlassAlpha(child, depth + 1);
+   }
+}
+
 /**
  * Gives the title bar of a Logic Pro window the real dark appearance when the control bar is set
  * to Original. Only a window that Logic Pro's own code shows qualifies, so a plug-in window, even
@@ -1663,6 +1678,7 @@ static void darkenControlBar(NSWindow *window) {
          }
          darkenToolbarViews(view, 0);
          restorePluginAppearance(view);
+         restoreGlassAlpha(view, 0);
       }
    }
 }
@@ -1719,11 +1735,18 @@ static void hookPlatterLayout(NSView *platter, SEL sel) {
    // and a dark title bar keeps its stock glass.
    darkenControlBar(platter.window);
    if (isInDarkControlBar(platter)) {
+      // The glass also holds the buttons and the display, so a dark title bar keeps it fully
+      // opaque, also when an earlier layout made it transparent (2026-11-15: faded control bar).
+      if ([glass isKindOfClass:objc_getClass("NSGlassContainerView")] && glass.alphaValue == PLATTER_ALPHA) {
+         glass.alphaValue = 1;
+      }
       ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
       return;
    }
-   if (surfaceMax < 1 && [glass isKindOfClass:objc_getClass("NSGlassContainerView")] && glass.alphaValue != PLATTER_ALPHA) {
-      glass.alphaValue = PLATTER_ALPHA;
+   // The glass is never made transparent any more: on macOS 26 and later it also holds the
+   // buttons and the display, so a lower opacity faded the whole control bar (Adi, 2026-11-15).
+   if ([glass isKindOfClass:objc_getClass("NSGlassContainerView")] && glass.alphaValue == PLATTER_ALPHA) {
+      glass.alphaValue = 1;
    }
    ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
 }
