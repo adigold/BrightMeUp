@@ -16,7 +16,8 @@
 </p>
 
 <p align="center">
-  Powered by <a href="https://inplug.app">InPlug.app</a>
+  Powered by <a href="https://inplug.app">InPlug.app</a><br>
+  Built on <a href="https://github.com/karlingen/i-see-logic-pro">I See Logic Pro</a> by <a href="https://github.com/karlingen">Karl Metum</a>
 </p>
 
 <p align="center">
@@ -109,7 +110,7 @@ The app is built at `app/BrightMeUp.app`. Set `SIGN_ID` to your own Developer ID
 
 ## About
 
-BrightMeUp builds on [I See Logic Pro](https://github.com/karlingen/i-see-logic-pro) by Karl Metum, an open source project under the MIT license. Thank you, Karl.
+BrightMeUp builds on [I See Logic Pro](https://github.com/karlingen/i-see-logic-pro) by [Karl Metum](https://github.com/karlingen), an open source project under the MIT license. Thank you, Karl.
 
 BrightMeUp is not made by Apple, and Apple does not support it. Logic Pro is a trademark of Apple Inc. See [LICENSE](LICENSE) for the license.
 
