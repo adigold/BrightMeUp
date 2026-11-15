@@ -644,6 +644,23 @@ struct ContentView: View {
       store(list)
    }
 
+   /**
+    * Loads a preset file, keeps it in My presets (replacing one with the same name) and applies it.
+    */
+   func loadPresetFile() {
+      guard let preset = importPreset() else {
+         return
+      }
+      store(saved.filter { (p) in return p.name != preset.name } + [ preset ])
+      apply(preset.surfaceMax, preset.gamma, preset.areas ?? [:])
+   }
+
+   // The current look as a preset to share, named after the preset it matches.
+   var currentLook: SavedPreset {
+      return SavedPreset(name: presetName == CUSTOM ? "My Look" : presetName.replacingOccurrences(of: USER_TAG, with: ""),
+         surfaceMax: surfaceMax, gamma: gamma, areas: areas.customized)
+   }
+
    func deletePreset(_ preset: SavedPreset) {
       store(saved.filter { (p) in return p.id != preset.id })
    }
@@ -666,6 +683,7 @@ struct ContentView: View {
                   presetRow(name: p.name, summary: "Saved", surface: p.surfaceMax, hasAreas: !(p.areas ?? [:]).isEmpty)
                      .tag(p.id)
                      .contextMenu {
+                        Button("Export \(p.name)...") { exportPreset(p) }
                         Button("Delete \(p.name)", role: .destructive) { deletePreset(p) }
                      }
                }
@@ -742,6 +760,14 @@ struct ContentView: View {
                   }
                   .padding(12)
                }
+               Menu {
+                  Button("Load Preset...", action: loadPresetFile)
+                  Button("Export Current Look...") { exportPreset(currentLook) }
+               } label: {
+                  Label("Share", systemImage: "square.and.arrow.up")
+               }
+               .fixedSize()
+               .help("Load a preset file, or save your current look as a file to share")
             }
             if tab == "areas" {
                areaList
