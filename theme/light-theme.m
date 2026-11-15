@@ -453,6 +453,9 @@ static BOOL isPluginWindow(NSWindow *window) {
 // must not run: early in the launch, asking AppKit for the drawing appearance starts its appearance
 // setup, which calls +appearanceNamed: back into the theme and stops Logic Pro (2026-11-14 crash).
 static atomic_bool hasPluginWindow = false;
+// Set once a Logic title bar has the real dark appearance (control bar set to Original). From then
+// on, drawing in the dark appearance stays stock there too, for the same reason as a plug-in.
+static atomic_bool hasDarkControlBar = false;
 // Guards against the same kind of loop on one thread at any later time.
 static __thread BOOL isCheckingPlugin = NO;
 
@@ -506,7 +509,7 @@ static BOOL isPluginDrawing(void) {
    if (pluginDrawDepth > 0) {
       return YES;
    }
-   if (!atomic_load_explicit(&hasPluginWindow, memory_order_acquire) || isCheckingPlugin) {
+   if (!(atomic_load_explicit(&hasPluginWindow, memory_order_acquire) || atomic_load_explicit(&hasDarkControlBar, memory_order_acquire)) || isCheckingPlugin) {
       return NO;
    }
    isCheckingPlugin = YES;
@@ -740,6 +743,10 @@ static NSBitmapImageRep *recoloredRep(NSImageRep *rep, ImageStyle style) {
    recoloredImages += 1;
    return replacement;
 }
+
+static char originalKey;
+static BOOL isControlBarOriginal(void);
+static BOOL isInDarkControlBar(NSView *view);
 
 static NSImage *recoloredImage(NSImage *image, ImageStyle style) {
    NSImage *copy = nil;
@@ -1364,8 +1371,49 @@ static BOOL isColored(NSColor *color) {
 
 // Glyphs are tinted with label colors, which are black here. Active colored buttons keep their
 // fill, so their glyphs must stay white. Neutral fills stay light, and need a dark glyph.
+// Reports if an image has any clearly colored, visible pixel. Drawn once per glyph, at 32 points.
+static BOOL hasColoredPixels(NSImage *image) {
+   enum { SIDE = 32 };
+   uint8_t pixels[SIDE * SIDE * 4] = { 0 };
+   CGContextRef ctx = CGBitmapContextCreate(pixels, SIDE, SIDE, 8, SIDE * 4, srgbSpace, kCGImageAlphaPremultipliedLast);
+   BOOL colored = NO;
+
+   if (!ctx) {
+      return YES;
+   }
+   [NSGraphicsContext saveGraphicsState];
+   NSGraphicsContext.currentContext = [NSGraphicsContext graphicsContextWithCGContext:ctx flipped:NO];
+   [image drawInRect:NSMakeRect(0, 0, SIDE, SIDE) fromRect:NSZeroRect operation:NSCompositingOperationSourceOver fraction:1];
+   [NSGraphicsContext restoreGraphicsState];
+   CGContextRelease(ctx);
+   for (int i = 0; i < SIDE * SIDE && !colored; i++) {
+      uint8_t *p = pixels + i * 4;
+
+      colored = p[3] > 64 && !isGrayish(p[0] / (CGFloat)p[3], p[1] / (CGFloat)p[3], p[2] / (CGFloat)p[3]);
+   }
+   return colored;
+}
+
 static void hookToolbarImage(NSButtonCell *cell, SEL sel, NSImage *image, NSRect frame, NSView *view) {
-   BOOL isActive = !shouldSkip() && cell.state == NSControlStateValueOn && isColored(object_getIvar(cell, toolbarOnColor));
+   // In the dark control bar, Logic's symbol glyphs carry the color they got when they were made,
+   // which is the light theme's dark gray. As template images, macOS tints them for the dark look.
+   if (pthread_main_np() && isInDarkControlBar(view) && image && !image.isTemplate) {
+      NSImage *glyph = objc_getAssociatedObject(image, &originalKey);
+
+      if (!glyph) {
+         // A colored glyph, such as the red record button, keeps its own colors.
+         glyph = hasColoredPixels(image) ? (id)[NSNull null] : [image copy];
+         if (glyph != (id)[NSNull null]) {
+            glyph.template = YES;
+         }
+         objc_setAssociatedObject(image, &originalKey, glyph, OBJC_ASSOCIATION_RETAIN);
+      }
+      if (glyph != (id)[NSNull null]) {
+         ((void (*)(id, SEL, NSImage *, NSRect, NSView *))origToolbarImage)(cell, sel, glyph, frame, view);
+         return;
+      }
+   }
+  BOOL isActive = !shouldSkip() && cell.state == NSControlStateValueOn && isColored(object_getIvar(cell, toolbarOnColor));
 
    ((void (*)(id, SEL, NSImage *, NSRect, NSView *))origToolbarImage)(cell, sel, isActive ? whiteGlyph(image) : image, frame, view);
 }
@@ -1404,6 +1452,9 @@ static IMP origViewMoved, origViewSetAppearance;
 static void hookViewMoved(NSView *view, SEL sel) {
    ((void (*)(id, SEL))origViewMoved)(view, sel);
    if (!isRealtimeThread() && view.window && isPluginWindow(view.window)) {
+      restorePluginAppearance(view);
+   } else if (!isRealtimeThread() && pthread_main_np() && isInDarkControlBar(view)) {
+      // Logic's own toolbar buttons ask for the dark appearance, which the theme maps to light.
       restorePluginAppearance(view);
    }
 }
@@ -1558,8 +1609,29 @@ static void hookDrawBackingLayer(NSView *view, SEL sel, CALayer *layer, CGContex
 static void hookViewSetAppearance(NSView *view, SEL sel, NSAppearance *appearance) {
    if (appearance == mappedAqua && !isRealtimeThread() && view.window && isPluginWindow(view.window)) {
       appearance = trueDarkAqua;
+   } else if (appearance == mappedAqua && !isRealtimeThread() && pthread_main_np() && isInDarkControlBar(view)) {
+      appearance = trueDarkAqua;
    }
    ((void (*)(id, SEL, NSAppearance *))origViewSetAppearance)(view, sel, appearance);
+}
+
+// The toolbar view takes its appearance from the window, not from the title bar above it, so the
+// toolbar views get the dark appearance too. The toolbar sits a few levels below the title bar.
+static void darkenToolbarViews(NSView *view, int depth) {
+   Class toolbar = objc_getClass("NSToolbarView");
+
+   if (!toolbar || depth > 4) {
+      return;
+   }
+   for (NSView *child in view.subviews) {
+      if ([child isKindOfClass:toolbar]) {
+         if (child.appearance != trueDarkAqua) {
+            child.appearance = trueDarkAqua;
+         }
+      } else {
+         darkenToolbarViews(child, depth + 1);
+      }
+   }
 }
 
 /**
@@ -1578,8 +1650,13 @@ static void darkenControlBar(NSWindow *window) {
       return;
    }
    for (NSView *view in window.contentView.superview.subviews) {
-      if ([view isKindOfClass:container] && view.appearance != trueDarkAqua) {
-         view.appearance = trueDarkAqua;
+      if ([view isKindOfClass:container]) {
+         atomic_store_explicit(&hasDarkControlBar, true, memory_order_release);
+         if (view.appearance != trueDarkAqua) {
+            view.appearance = trueDarkAqua;
+         }
+         darkenToolbarViews(view, 0);
+         restorePluginAppearance(view);
       }
    }
 }
