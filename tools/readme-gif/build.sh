@@ -15,7 +15,7 @@ swiftc -parse-as-library -O -D GIF_RENDER -target arm64-apple-macos14 -import-ob
 ffmpeg -v error -y -framerate 20 -i "$work/frames/frame-%04d.png" \
    -vf "scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=sierra2_4a" \
    -loop 0 docs/brightmeup.gif || exit 1
-sips -z 256 256 "$work/icon.png" --out docs/icon.png > /dev/null
+sips -z 256 256 "$work/icon.png" --out docs/app-icon.png > /dev/null
 # KEEP_FRAMES=1 keeps the rendered frames for a look.
 if [ -n "$KEEP_FRAMES" ]; then
    echo "Frames: $work/frames"
