@@ -6,6 +6,7 @@ Layout (2026-10-13): `- [ ]` open in **Inbox**, `- [~]` in progress in **Now**, 
 After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--start BL-n` when work begins, `--done BL-n` when it is finished, `--drop BL-n "why"` to drop it.
 
 ## Inbox
+- [ ] **BL-29** `P2 · Medium` **Windows and panels set to Original gives dark text on dark bars:** found while testing BL-28. With Windows and panels on Original, shared bars such as the one with Edit, Functions and View keep their dark background but their text turns black. No user has reported it yet.
 
 
 
@@ -31,6 +32,7 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 ## Done
+- [x] **BL-28** `P1 · High` **Dark control bar below 100% gives Settings a dark background with black text:** higherground, using the "higherground" preset (control bar Original, Brightness 0.92), saw the Settings window dark with black text. Cause: below 100% the theme gave such windows the control bar background, which stays stock dark when the control bar is Original. Fix: in that mode these windows keep the same light background as at 100%. Nothing else changes, plug-ins stay stock, reviewed by Codex and Fable 5.2. · done 2026-11-15
 - [x] **BL-27** `P2 · Medium` **New app icon, light switch:** replace the app icon with the light switch design Adi picked (option 2 of 10), in the app, the DMG and the README (Adi, 2026-11-15). · done 2026-11-15 (1.4.0)
 - [x] **BL-26** `P1 · High` **README unlike I See Logic Pro:** rewrite README.md so its structure, sections, tables and images do not look like the I See Logic Pro README (Adi, 2026-11-15). · done 2026-11-15
 - [x] **BL-25** `P2 · Medium` **Share presets as files:** Export a saved preset to a file and Load Preset from a file, so users can send each other presets (Adi, 2026-11-15, after the forum thread). · done 2026-11-15 (1.3.7)

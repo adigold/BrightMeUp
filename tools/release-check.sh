@@ -31,7 +31,7 @@ fi
 reports=~/Library/Logs/DiagnosticReports
 before=$(ls "$reports" 2>/dev/null | grep -c "^Logic Pro")
 
-open -g -n --env DYLD_INSERT_LIBRARIES="$library" --env LP_OUT="$work/out" --env LP_DELAY=50 --env LP_PLAY=1 \
+open -g -n --env DYLD_INSERT_LIBRARIES="$library" --env LP_OUT="$work/out" --env LP_DELAY=50 --env LP_PLAY=1 --env LP_INVISIBLE=1 \
    -a "/Applications/Logic Pro.app" $target || fail "Logic Pro did not start."
 # Logic Pro ends itself after LP_DELAY. Allow two minutes in all.
 waited=0

@@ -1695,7 +1695,10 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
          window.appearance = trueDarkAqua;
       }
       restorePluginAppearance(window.contentView.superview ?: window.contentView);
-   } else if (surfaceMax < 1 && place != NSWindowOut && isLogicWindow(window) && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
+   } else if (surfaceMax < 1 && !isControlBarOriginal() && place != NSWindowOut && isLogicWindow(window) && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
+      // With the control bar set to Original, BackgroundViewControlbar stays stock dark, so a window
+      // such as Settings got a dark background under black text. Such a window keeps its own light
+      // background and title bar, as at 100 percent (BL-28, higherground, 2026-11-15).
       window.titlebarAppearsTransparent = YES;
       if ([window.backgroundColor isEqual:NSColor.windowBackgroundColor]) {
          window.backgroundColor = [NSColor colorNamed:@"BackgroundViewControlbar"];
@@ -1767,6 +1770,41 @@ static void renderTest(void) {
 
          [NSApp sendEvent:down];
          [NSApp sendEvent:up];
+      });
+   }
+
+   // LP_INVISIBLE keeps every test window fully transparent on screen; the render still sees them,
+   // so a test never shows Logic Pro to the person at the Mac.
+   if (getenv("LP_INVISIBLE")) {
+      NSTimer *hide = [NSTimer timerWithTimeInterval:0.02 repeats:YES block:^(NSTimer *timer) {
+         for (NSWindow *w in NSApp.windows) {
+            if (w.alphaValue != 0) {
+               w.alphaValue = 0;
+            }
+         }
+      }];
+
+      [[NSRunLoop mainRunLoop] addTimer:hide forMode:NSRunLoopCommonModes];
+   }
+   // LP_SETTINGS opens the Settings window halfway, so the test sees it.
+   if (getenv("LP_SETTINGS")) {
+      // A launch alert, such as missing sounds, would block the menu; it is answered Not Now first.
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)delay * NSEC_PER_SEC / 3), dispatch_get_main_queue(), ^{
+         if (NSApp.modalWindow) {
+            [NSApp stopModalWithCode:NSAlertThirdButtonReturn];
+         }
+      });
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)delay * NSEC_PER_SEC / 2), dispatch_get_main_queue(), ^{
+         // Logic fills the Settings submenu only when it opens, so the test fills it first.
+         NSMenu *settings = [NSApp.mainMenu.itemArray.firstObject.submenu itemWithTitle:@"Settings"].submenu;
+
+         if ([settings.delegate respondsToSelector:@selector(menuNeedsUpdate:)]) {
+            [settings.delegate menuNeedsUpdate:settings];
+         }
+         [settings update];
+         if (settings.numberOfItems > 0) {
+            [settings performActionForItemAtIndex:0];
+         }
       });
    }
 
