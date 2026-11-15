@@ -23,6 +23,7 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 ## Now
+- [~] **BL-26** `P1 · High` **README unlike I See Logic Pro:** rewrite README.md so its structure, sections, tables and images do not look like the I See Logic Pro README (Adi, 2026-11-15).
 
 
 - [~] **BL-18** `P1 · High` **Null test:** prove the audio is identical with and without BrightMeUp by comparing two bounces sample by sample. Adi asked 2026-11-14. tools/null-test.sh written and self-tested; needs two bounces of the same project (stock and BrightMeUp).
