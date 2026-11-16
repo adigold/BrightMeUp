@@ -797,14 +797,18 @@ struct ContentView: View {
                   .controlSize(.large)
                   .disabled(!status.canStart)
             }
-            HStack(spacing: 5) {
-               Text("Built on")
-               Link("I See Logic Pro", destination: URL(string: "https://github.com/karlingen/i-see-logic-pro")!)
-                  .fontWeight(.semibold)
-                  .foregroundStyle(.tint)
-               Text("by Karl Metum")
+            VStack(spacing: 3) {
+               HStack(spacing: 5) {
+                  Text("Powered by")
+                  Link("InPlug.app", destination: URL(string: "https://inplug.app")!)
+                     .fontWeight(.semibold)
+                     .foregroundStyle(.tint)
+                     .help("Open inplug.app")
+               }
+               .font(.body)
+               Text("© \(String(Calendar.current.component(.year, from: Date()))) InPlug/AGsoundtrax LLC, All rights reserved.")
+                  .font(.caption)
             }
-            .font(.caption)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity)
          }

@@ -32,6 +32,7 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 ## Done
+- [x] **BL-30** `P2 · Medium` **Bring back the InPlug footer:** Adi asked to show "Powered by InPlug.app" and the © InPlug/AGsoundtrax LLC line at the bottom of the app again, as before 1.4.0. It replaces the "Built on I See Logic Pro" line; the MIT notice stays in LICENSE. Shipped in 1.4.2. · done 2026-11-16
 - [x] **BL-28** `P1 · High` **Dark control bar below 100% gives Settings a dark background with black text:** higherground, using the "higherground" preset (control bar Original, Brightness 0.92), saw the Settings window dark with black text. Cause: below 100% the theme gave such windows the control bar background, which stays stock dark when the control bar is Original. Fix: in that mode these windows keep the same light background as at 100%. Nothing else changes, plug-ins stay stock, reviewed by Codex and Fable 5.2. · done 2026-11-15
 - [x] **BL-27** `P2 · Medium` **New app icon, light switch:** replace the app icon with the light switch design Adi picked (option 2 of 10), in the app, the DMG and the README (Adi, 2026-11-15). · done 2026-11-15 (1.4.0)
 - [x] **BL-26** `P1 · High` **README unlike I See Logic Pro:** rewrite README.md so its structure, sections, tables and images do not look like the I See Logic Pro README (Adi, 2026-11-15). · done 2026-11-15
