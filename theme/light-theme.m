@@ -1829,8 +1829,19 @@ static void lightenTitleBar(NSWindow *window) {
    Class container = objc_getClass("NSTitlebarContainerView");
    Class toolbar = objc_getClass("NSToolbarView");
 
-   if (!trueAqua || !container || !isLogicOwnedWindow(window) || !(window.styleMask & NSWindowStyleMaskTitled)) {
+   // Logic's project windows, the ones with the control bar, and the Settings window. Settings gets
+   // the light system style, so its text is black on the gray (Adi, 2026-11-22: 1.5.1 put white
+   // text on that gray). Every other window keeps Logic's dark style.
+   Class project = objc_getClass("CLgDocwPanel");
+   Class settings = objc_getClass("MyMAKitPanel");
+   BOOL isProject = project && [window isKindOfClass:project];
+   BOOL isSettings = settings && [window isKindOfClass:settings];
+
+   if (!trueAqua || !container || !(isProject || isSettings) || !isLogicOwnedWindow(window) || !(window.styleMask & NSWindowStyleMaskTitled)) {
       return;
+   }
+   if (isSettings && window.appearance != trueAqua) {
+      window.appearance = trueAqua;
    }
    // A flat gray title bar, as in Logic 12: the title bar shows the window background.
    if (!window.titlebarAppearsTransparent) {
