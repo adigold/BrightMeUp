@@ -48,6 +48,8 @@
 #define ASSETUTIL_PATH @"/usr/bin/assetutil"
 #define FIELD_DARK_MAX 0.5
 #define PLATTER_ALPHA 0.35
+// NSGlassEffectViewStyleClear in the macOS 26 SDK.
+#define GLASS_STYLE_CLEAR 1
 
 // A pale blue, because list text is black in this theme.
 static const CGFloat FOCUSED_ROW_COLOR[3] = { 0.72, 0.84, 0.96 };
@@ -1808,14 +1810,14 @@ static void hideToolbarGlass(NSView *view, int depth) {
       return;
    }
    for (NSView *child in view.subviews) {
-      if ([child isKindOfClass:glass]) {
-         NSGlassEffectView *effect = (NSGlassEffectView *)child;
-
-         if (effect.style != NSGlassEffectViewStyleClear) {
-            effect.style = NSGlassEffectViewStyleClear;
+      // Through key-value coding, so the file also builds with SDKs older than macOS 26, which do
+      // not declare NSGlassEffectView (the GitHub test runner).
+      if ([child isKindOfClass:glass] && [child respondsToSelector:@selector(setTintColor:)] && [child respondsToSelector:NSSelectorFromString(@"setStyle:")]) {
+         if ([[child valueForKey:@"style"] integerValue] != GLASS_STYLE_CLEAR) {
+            [child setValue:@(GLASS_STYLE_CLEAR) forKey:@"style"];
          }
-         if (![effect.tintColor isEqual:classicTitleGray]) {
-            effect.tintColor = classicTitleGray;
+         if (![[child valueForKey:@"tintColor"] isEqual:classicTitleGray]) {
+            [child setValue:classicTitleGray forKey:@"tintColor"];
          }
       }
       hideToolbarGlass(child, depth + 1);
