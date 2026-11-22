@@ -1845,6 +1845,17 @@ static void lightenTitleBar(NSWindow *window) {
    if (isSettings && window.appearance != trueAqua) {
       window.appearance = trueAqua;
    }
+   // Settings keeps the standard light glass behind its row of tabs; the tinted clear glass of the
+   // project window looked lumpy there (Adi, 2026-11-22).
+   if (isSettings) {
+      if (!window.titlebarAppearsTransparent) {
+         window.titlebarAppearsTransparent = YES;
+      }
+      if (window.backgroundColor != classicTitleGray) {
+         window.backgroundColor = classicTitleGray;
+      }
+      return;
+   }
    // A flat gray title bar, as in Logic 12: the title bar shows the window background.
    if (!window.titlebarAppearsTransparent) {
       window.titlebarAppearsTransparent = YES;
@@ -1994,6 +2005,20 @@ static void renderTest(void) {
       }];
 
       [[NSRunLoop mainRunLoop] addTimer:hide forMode:NSRunLoopCommonModes];
+   }
+   // LP_BEHIND keeps every test window at desktop level, behind all other windows, so a true
+   // capture (screencapture -l) sees the real glass while the person at the Mac does not.
+   if (getenv("LP_BEHIND")) {
+      NSTimer *behind = [NSTimer timerWithTimeInterval:0.02 repeats:YES block:^(NSTimer *timer) {
+         for (NSWindow *w in NSApp.windows) {
+            if (w.level != kCGDesktopWindowLevel) {
+               w.level = kCGDesktopWindowLevel;
+               [w orderBack:nil];
+            }
+         }
+      }];
+
+      [[NSRunLoop mainRunLoop] addTimer:behind forMode:NSRunLoopCommonModes];
    }
    // LP_SETTINGS opens the Settings window halfway, so the test sees it.
    if (getenv("LP_SETTINGS")) {
