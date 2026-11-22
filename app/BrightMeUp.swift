@@ -792,9 +792,11 @@ struct ContentView: View {
                .help("Load a preset file, or save your current look as a file to share")
             }
             if isLogic12 {
-               Text("Logic Pro 12 Look keeps Logic Pro dark, with the lighter grays and the flat gray title bar of Logic Pro 12. Brightness, Contrast and Areas apply to the light looks; pick one of them in the sidebar to use them again.")
+               // A frame and not fixedSize: fixedSize let the long text widen the whole page past the
+               // window, which left the page empty (1.5.0).
+               Text("Logic Pro 12 Look keeps Logic Pro dark, with the grays and the flat title bar of Logic Pro 12. Brightness, Contrast and Areas are for the light looks.")
                   .font(.callout).foregroundStyle(.secondary)
-                  .fixedSize(horizontal: false, vertical: true)
+                  .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                Spacer(minLength: 0)
             } else if tab == "areas" {
                areaList
