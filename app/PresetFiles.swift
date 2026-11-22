@@ -38,7 +38,8 @@ func sanitized(_ preset: SavedPreset) -> SavedPreset? {
          gamma: keep(value.gamma, GAMMA_RANGE, GAMMA_DEFAULT))
    }
    return SavedPreset(name: name, surfaceMax: keep(preset.surfaceMax, SURFACE_RANGE, SURFACE_MAX_DEFAULT),
-      gamma: keep(preset.gamma, GAMMA_RANGE, GAMMA_DEFAULT), areas: areas)
+      gamma: keep(preset.gamma, GAMMA_RANGE, GAMMA_DEFAULT), areas: areas,
+      look: preset.look == Int(LOOK_LOGIC12) ? Int(LOOK_LOGIC12) : nil)
 }
 
 /**

@@ -75,10 +75,12 @@ struct Preset: Identifiable {
    let surfaceMax: Double
    let gamma: Double
    var areas: [String: AreaValue] = [:]
+   // LOOK_LIGHT, or LOOK_LOGIC12 for Logic Pro dark with the grays of Logic Pro 12 (BL-32).
+   var look = Int(LOOK_LIGHT)
    var id: String { return name }
 }
 
-let PRESET_GROUPS = [ "Bright", "Balanced", "Dim", "High contrast", "Low contrast", "By area" ]
+let PRESET_GROUPS = [ "Bright", "Balanced", "Dim", "High contrast", "Low contrast", "By area", "Classic" ]
 
 let PRESETS = [
    Preset(name: "Clear", group: "Bright", summary: "Default", surfaceMax: SURFACE_MAX_DEFAULT, gamma: GAMMA_DEFAULT),
@@ -122,7 +124,11 @@ let PRESETS = [
       gamma: 1.35, areas: [ "tracks": custom(0.7, 1.1) ]),
    Preset(name: "Score Writer", group: "By area", summary: "Paper-white editors", surfaceMax: 0.8, gamma: 1,
       areas: [ "editors": custom(1, 0.45) ]),
+   Preset(name: "Logic Pro 12 Look", group: "Classic", summary: "Dark, with the Logic Pro 12 grays",
+      surfaceMax: SURFACE_MAX_DEFAULT, gamma: GAMMA_DEFAULT, look: Int(LOOK_LOGIC12)),
 ]
+// The swatch of the Logic Pro 12 Look in the sidebar: its track header gray.
+let LOGIC12_SWATCH = 87.0 / 255
 let USER_TAG = "user:"
 
 struct SavedPreset: Codable, Identifiable {
@@ -131,6 +137,8 @@ struct SavedPreset: Codable, Identifiable {
    let gamma: Double
    // Missing in presets saved before areas existed.
    var areas: [String: AreaValue]?
+   // Missing in presets saved before the Logic Pro 12 Look, and in light presets.
+   var look: Int?
    var id: String { return USER_TAG + name }
 }
 
@@ -494,6 +502,8 @@ struct ContentView: View {
    @AppStorage("gamma") var gamma = GAMMA_DEFAULT
    @AppStorage("savedPresets") var savedJSON = "[]"
    @AppStorage("tab") var tab = "overall"
+   // The theme reads the same key; see LOOK_LIGHT in theme/gray-rule.h.
+   @AppStorage("look") var look = Int(LOOK_LIGHT)
    @StateObject var areas = AreaStore()
    @State var status = getLaunchStatus()
    @State var columns = NavigationSplitViewVisibility.all
@@ -517,18 +527,22 @@ struct ContentView: View {
 
    var isDefault: Bool {
       return abs(surfaceMax - SURFACE_MAX_DEFAULT) < PRESET_MATCH && abs(gamma - GAMMA_DEFAULT) < PRESET_MATCH
-         && areas.customized.isEmpty
+         && areas.customized.isEmpty && look == Int(LOOK_LIGHT)
+   }
+
+   var isLogic12: Bool {
+      return look == Int(LOOK_LOGIC12)
    }
 
    var presetName: String {
-      let matches = { (s: Double, g: Double, a: [String: AreaValue]) in
-         return abs(s - surfaceMax) < PRESET_MATCH && abs(g - gamma) < PRESET_MATCH && areas.matches(a)
+      let matches = { (s: Double, g: Double, a: [String: AreaValue], l: Int) in
+         return abs(s - surfaceMax) < PRESET_MATCH && abs(g - gamma) < PRESET_MATCH && areas.matches(a) && l == look
       }
 
-      if let p = PRESETS.first(where: { (p) in return matches(p.surfaceMax, p.gamma, p.areas) }) {
+      if let p = PRESETS.first(where: { (p) in return matches(p.surfaceMax, p.gamma, p.areas, p.look) }) {
          return p.name
       }
-      if let p = saved.first(where: { (p) in return matches(p.surfaceMax, p.gamma, p.areas ?? [:]) }) {
+      if let p = saved.first(where: { (p) in return matches(p.surfaceMax, p.gamma, p.areas ?? [:], p.look ?? Int(LOOK_LIGHT)) }) {
          return p.id
       }
       return CUSTOM
@@ -539,9 +553,9 @@ struct ContentView: View {
          get: { return presetName },
          set: { (name) in
             if let p = PRESETS.first(where: { (p) in return p.name == name }) {
-               apply(p.surfaceMax, p.gamma, p.areas)
+               apply(p.surfaceMax, p.gamma, p.areas, p.look)
             } else if let p = saved.first(where: { (p) in return p.id == name }) {
-               apply(p.surfaceMax, p.gamma, p.areas ?? [:])
+               apply(p.surfaceMax, p.gamma, p.areas ?? [:], p.look ?? Int(LOOK_LIGHT))
             }
          }
       )
@@ -557,8 +571,9 @@ struct ContentView: View {
    func themeFor(_ key: String) -> ThemeValues {
       let value = areas[key]
 
-      // Plug-ins always keep their own look; BrightMeUp changes only the Logic Pro interface.
-      if showsStock || key == "plugins" || value.mode == Int(AREA_MODE_ORIGINAL) {
+      // Plug-ins always keep their own look; BrightMeUp changes only the Logic Pro interface. The
+      // Logic Pro 12 Look keeps Logic Pro dark, so its preview shows the dark grays.
+      if showsStock || isLogic12 || key == "plugins" || value.mode == Int(AREA_MODE_ORIGINAL) {
          return ThemeValues(surfaceMax: 1, gamma: 1, isStock: true)
       }
       if value.mode == Int(AREA_MODE_CUSTOM) {
@@ -568,6 +583,9 @@ struct ContentView: View {
    }
 
    var previewCaption: String {
+      if isLogic12 {
+         return "Logic Pro 12 Look: Logic Pro stays dark, with the lighter grays of Logic Pro 12"
+      }
       if previewKind == "plugin" {
          return "Plug-ins always keep their own look. BrightMeUp changes only the Logic Pro interface."
       }
@@ -607,10 +625,11 @@ struct ContentView: View {
       }
    }
 
-   func apply(_ s: Double, _ g: Double, _ a: [String: AreaValue]) {
+   func apply(_ s: Double, _ g: Double, _ a: [String: AreaValue], _ l: Int = Int(LOOK_LIGHT)) {
       surfaceMax = clamp(s, SURFACE_RANGE)
       gamma = clamp(g, GAMMA_RANGE)
       areas.setAll(a)
+      look = l == Int(LOOK_LOGIC12) ? l : Int(LOOK_LIGHT)
    }
 
    func clamp(_ value: Double, _ range: ClosedRange<Double>) -> Double {
@@ -640,7 +659,7 @@ struct ContentView: View {
       if name.isEmpty {
          return
       }
-      list.append(SavedPreset(name: name, surfaceMax: surfaceMax, gamma: gamma, areas: areas.customized))
+      list.append(SavedPreset(name: name, surfaceMax: surfaceMax, gamma: gamma, areas: areas.customized, look: isLogic12 ? look : nil))
       store(list)
    }
 
@@ -652,13 +671,13 @@ struct ContentView: View {
          return
       }
       store(saved.filter { (p) in return p.name != preset.name } + [ preset ])
-      apply(preset.surfaceMax, preset.gamma, preset.areas ?? [:])
+      apply(preset.surfaceMax, preset.gamma, preset.areas ?? [:], preset.look ?? Int(LOOK_LIGHT))
    }
 
    // The current look as a preset to share, named after the preset it matches.
    var currentLook: SavedPreset {
       return SavedPreset(name: presetName == CUSTOM ? "My Look" : presetName.replacingOccurrences(of: USER_TAG, with: ""),
-         surfaceMax: surfaceMax, gamma: gamma, areas: areas.customized)
+         surfaceMax: surfaceMax, gamma: gamma, areas: areas.customized, look: isLogic12 ? look : nil)
    }
 
    func deletePreset(_ preset: SavedPreset) {
@@ -673,14 +692,16 @@ struct ContentView: View {
             ForEach(PRESET_GROUPS, id: \.self) { (group) in
                Section(group) {
                   ForEach(PRESETS.filter { (p) in return p.group == group }) { (p) in
-                     presetRow(name: p.name, summary: p.summary, surface: p.surfaceMax, hasAreas: !p.areas.isEmpty)
+                     presetRow(name: p.name, summary: p.summary, surface: p.look == Int(LOOK_LOGIC12) ? LOGIC12_SWATCH : p.surfaceMax,
+                        hasAreas: !p.areas.isEmpty)
                         .tag(p.name)
                   }
                }
             }
             Section("My presets") {
                ForEach(saved) { (p) in
-                  presetRow(name: p.name, summary: "Saved", surface: p.surfaceMax, hasAreas: !(p.areas ?? [:]).isEmpty)
+                  presetRow(name: p.name, summary: "Saved", surface: p.look == Int(LOOK_LOGIC12) ? LOGIC12_SWATCH : p.surfaceMax,
+                     hasAreas: !(p.areas ?? [:]).isEmpty)
                      .tag(p.id)
                      .contextMenu {
                         Button("Export \(p.name)...") { exportPreset(p) }
@@ -737,6 +758,7 @@ struct ContentView: View {
                .pickerStyle(.segmented)
                .labelsHidden()
                .frame(width: 200)
+               .disabled(isLogic12)
                Spacer()
                Button {
                   resetToDefault()
@@ -769,7 +791,12 @@ struct ContentView: View {
                .fixedSize()
                .help("Load a preset file, or save your current look as a file to share")
             }
-            if tab == "areas" {
+            if isLogic12 {
+               Text("Logic Pro 12 Look keeps Logic Pro dark, with the lighter grays and the flat gray title bar of Logic Pro 12. Brightness, Contrast and Areas apply to the light looks; pick one of them in the sidebar to use them again.")
+                  .font(.callout).foregroundStyle(.secondary)
+                  .fixedSize(horizontal: false, vertical: true)
+               Spacer(minLength: 0)
+            } else if tab == "areas" {
                areaList
             } else {
                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 12) {

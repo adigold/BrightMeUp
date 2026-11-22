@@ -6,6 +6,7 @@ Layout (2026-10-13): `- [ ]` open in **Inbox**, `- [~]` in progress in **Now**, 
 After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--start BL-n` when work begins, `--done BL-n` when it is finished, `--drop BL-n "why"` to drop it.
 
 ## Inbox
+- [ ] **BL-31** `P1 · High` **Logic Pro always opens bright:** once a look is picked in BrightMeUp, every way of opening Logic Pro (Dock, Finder, double-clicking a project) must open it with that look, until Revert to Logic Defaults. Today only Start Logic Pro in BrightMeUp does (Adi, 2026-11-20).
 - [ ] **BL-29** `P2 · Medium` **Windows and panels set to Original gives dark text on dark bars:** found while testing BL-28. With Windows and panels on Original, shared bars such as the one with Edit, Functions and View keep their dark background but their text turns black. No user has reported it yet.
 
 
@@ -32,6 +33,7 @@ After adding an item run `node ~/.claude/scripts/backlog-linear.mjs --send`; `--
 
 
 ## Done
+- [x] **BL-32** `P2 · Medium` **"Logic 12" preset:** Adi wants a preset identical to his Logic 12 screenshot (2026-11-22): dark gray panels, inspector and track headers with white text (stock dark), a light gray tracks background (about 70% gray), and a light gray title and toolbar with the dark display. Needs a new area split, since today the Tracks area colors headers and lanes together. Shipped in 1.5.0 as the Logic Pro 12 Look preset: Logic stays dark, Logic 13 grays are set to the measured Logic 12 grays (tracks background 178, headers 87, Edit bar 72, ruler 63), flat gray title bar with the toolbar glass tinted to match; plug-ins stay stock (reviewed by Codex). · done 2026-11-22
 - [x] **BL-30** `P2 · Medium` **Bring back the InPlug footer:** Adi asked to show "Powered by InPlug.app" and the © InPlug/AGsoundtrax LLC line at the bottom of the app again, as before 1.4.0. It replaces the "Built on I See Logic Pro" line; the MIT notice stays in LICENSE. Shipped in 1.4.2. · done 2026-11-16
 - [x] **BL-28** `P1 · High` **Dark control bar below 100% gives Settings a dark background with black text:** higherground, using the "higherground" preset (control bar Original, Brightness 0.92), saw the Settings window dark with black text. Cause: below 100% the theme gave such windows the control bar background, which stays stock dark when the control bar is Original. Fix: in that mode these windows keep the same light background as at 100%. Nothing else changes, plug-ins stay stock, reviewed by Codex and Fable 5.2. · done 2026-11-15
 - [x] **BL-27** `P2 · Medium` **New app icon, light switch:** replace the app icon with the light switch design Adi picked (option 2 of 10), in the app, the DMG and the README (Adi, 2026-11-15). · done 2026-11-15 (1.4.0)

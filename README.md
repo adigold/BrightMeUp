@@ -6,7 +6,7 @@
 
 <p align="center">
   A bright look for Logic Pro.<br>
-  Turn the dark interface light, pick from 31 presets, and set each part of Logic Pro your way.
+  Turn the dark interface light, pick from 32 presets, and set each part of Logic Pro your way.
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 
 Logic Pro comes only in dark. In a bright studio, or after hours of mixing, a dark screen can tire your eyes. BrightMeUp opens Logic Pro in a light look, from crisp white to a calm gray, and you decide how far to go.
 
-- **31 ready looks** in six groups: Bright, Balanced, Dim, High contrast, Low contrast and By area.
+- **32 ready looks** in seven groups: Bright, Balanced, Dim, High contrast, Low contrast, By area and Classic.
 - **Every area on its own.** Tracks, Mixer, Editors, Control bar, Inspector, Browsers and shared panels can each follow your look, get their own values, or stay in the original dark.
 - **Your plug-ins look like always.** Every plug-in window, from Apple or any other maker, keeps its own design.
 - **See it first.** A live preview shows the Main window, Tracks, Mixer, Piano Roll and plug-ins, with a Before and After switch.
@@ -66,6 +66,10 @@ To export one of your saved presets, right-click it in the sidebar.
 Like the transport and display in dark? Pick the **Dark Control Bar** preset, or set Control bar to Original in the Areas tab. The rest of Logic Pro stays light.
 
 ![Logic Pro with a dark control bar and light tracks](docs/dark-control-bar.png)
+
+## The Logic Pro 12 look
+
+Miss the look of Logic Pro 12? Pick **Logic Pro 12 Look** in the Classic group. Logic Pro stays dark with white text, and gets the lighter grays, the light gray tracks background and the flat gray title bar of Logic Pro 12. Your plug-ins keep their own look.
 
 ## Going back to dark
 

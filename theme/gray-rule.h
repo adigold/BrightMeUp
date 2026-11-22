@@ -16,6 +16,10 @@
 #define AREA_MODE_OVERALL 0
 #define AREA_MODE_CUSTOM 1
 #define AREA_MODE_ORIGINAL 2
+// The look, stored as "look": 0 is the light theme, 1 keeps Logic Pro dark with the grays of
+// Logic Pro 12 (BL-32).
+#define LOOK_LIGHT 0
+#define LOOK_LOGIC12 1
 // The preferences domain of the launcher app, which is also its bundle identifier.
 #define SETTINGS_DOMAIN_NAME "com.adigoldstein.brightmeup"
 

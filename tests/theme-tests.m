@@ -77,6 +77,13 @@ static void testAreas(void) {
    readAreaSettings();
    check(areaSettings[AREA_PLUGINS].mode == AREA_MODE_ORIGINAL, "plug-in colors always keep the original look");
    check(copyMappedColor(color, @"ChannelEQPluginBypassGlyphOn") == NULL, "a plug-in color never changes");
+   classicLook = YES;
+   check(copyMappedColor(color, @"ChannelEQPluginBypassGlyphOn") == NULL, "a plug-in color never changes in the Logic Pro 12 Look");
+   mapped = copyMappedColor(color, @"TrackHeaderBackground");
+   check(mapped && isClose(CGColorGetComponents(mapped)[0], 87.0 / 255), "the Logic Pro 12 Look gives the track headers their Logic 12 gray");
+   CGColorRelease(mapped);
+   check(isClose(liftGray(20.0 / 255, 1), 47.0 / 255) && liftGray(0, 1) == 0 && isClose(liftGray(1, 1), 1), "the Logic Pro 12 curve lifts dark grays and keeps black and white");
+   classicLook = NO;
    check(!isPluginWindow(nil), "no window is not a plug-in window");
    CGColorRelease(color);
 }

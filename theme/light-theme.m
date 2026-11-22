@@ -92,6 +92,102 @@ static uintptr_t regionDrawStart, regionDrawEnd;
 static ImageRange panKnobDraw, arrangeKnobDraw, trackHeaderDraw, textDraw, rulerMarkerDraw, threePartDraw;
 static CGColorRef (*fillColorOf)(CGContextRef);
 
+// The Logic 12 look (BL-32, Adi, 2026-11-22): Logic Pro keeps its dark appearance and white text,
+// and only its grays move to the lighter grays of Logic Pro 12. It is its own path: when it is on,
+// start() installs only the color hooks, the plug-in guards and the title bar step below, never
+// the light theme's appearance, image or text hooks. Plug-in windows keep the stock look.
+static BOOL classicLook;
+// Stock Logic Pro 13 gray to Logic Pro 12 gray, measured from Logic Pro 12 screenshots. Between the
+// points the gray is interpolated; the curve only lifts, so the order of the grays stays.
+static const CGFloat CLASSIC_CURVE[][2] = {
+   { 0, 0 }, { 20.0 / 255, 47.0 / 255 }, { 38.0 / 255, 87.0 / 255 }, { 48.0 / 255, 92.0 / 255 },
+   { 80.0 / 255, 120.0 / 255 }, { 160.0 / 255, 170.0 / 255 }, { 1, 1 },
+};
+// Colors that Logic Pro 12 drew in a gray off the curve, by catalog name, as a level from 0 to 255.
+typedef struct { const char *name; CGFloat level; CGFloat alpha; } ClassicGray;
+static const ClassicGray CLASSIC_FIXED[] = {
+   // A negative alpha keeps the alpha of the stock color.
+   { "ArrangeTrackBackground", 178, -1 }, { "BackgroundWorkspace", 178, -1 },
+   { "TrackHeaderBackground", 87, -1 }, { "TrackHeaderBackgroundSelected", 115, -1 },
+   { "BackgroundLocalMenubar", 72, -1 }, { "RulerBackground", 51, -1 }, { "RulerCycleOffBackground", 255, 0.06 },
+   { "BackgroundViewControlbar", 166, -1 },
+};
+// LP_PROBE (test only, with LP_OUT) paints each catalog gray in a color that names it, so a render
+// shows which color draws which part of Logic Pro. The names go to probe.txt in LP_OUT.
+static BOOL probeColors = NO;
+static NSMutableArray<NSString *> *probeNames;
+
+static CGFloat liftGray(CGFloat white, CGFloat alpha) {
+   size_t count = sizeof(CLASSIC_CURVE) / sizeof(CLASSIC_CURVE[0]);
+
+   if ((alpha < 1 && white < SHADOW_LIMIT) || white <= 0) {
+      return white;
+   }
+   for (size_t i = 1; i < count; i++) {
+      if (white <= CLASSIC_CURVE[i][0]) {
+         CGFloat t = (white - CLASSIC_CURVE[i - 1][0]) / (CLASSIC_CURVE[i][0] - CLASSIC_CURVE[i - 1][0]);
+
+         return CLASSIC_CURVE[i - 1][1] + t * (CLASSIC_CURVE[i][1] - CLASSIC_CURVE[i - 1][1]);
+      }
+   }
+   return white;
+}
+
+/**
+ * Returns a copy of a catalog color for the Logic 12 look. Grays move to their Logic 12 level;
+ * every colored color stays.
+ *
+ * @param color CGColorRef - the original color
+ * @param name NSString * - the catalog color name
+ * @return CGColorRef - a retained color, or NULL if the color does not change
+ */
+static CGColorRef copyClassicColor(CGColorRef color, NSString *name) {
+   CGColorRef rgb = CGColorCreateCopyByMatchingToColorSpace(srgbSpace, kCGRenderingIntentDefault, color, NULL);
+   const CGFloat *c = rgb ? CGColorGetComponents(rgb) : NULL;
+   CGColorRef mapped = NULL;
+
+   if (c && CGColorGetNumberOfComponents(rgb) == 4) {
+      CGFloat level = (c[0] + c[1] + c[2]) / 3;
+      CGFloat spread = fmax(c[0], fmax(c[1], c[2])) - fmin(c[0], fmin(c[1], c[2]));
+      CGFloat fixed = -1, fixedAlpha = c[3];
+      const char *plain = [name hasPrefix:@"Colors/"] ? [name substringFromIndex:7].UTF8String : name.UTF8String;
+
+      for (size_t i = 0; i < sizeof(CLASSIC_FIXED) / sizeof(CLASSIC_FIXED[0]); i++) {
+         if (plain && CLASSIC_FIXED[i].name[0] && strcmp(plain, CLASSIC_FIXED[i].name) == 0) {
+            fixed = CLASSIC_FIXED[i].level / 255;
+            fixedAlpha = CLASSIC_FIXED[i].alpha >= 0 ? CLASSIC_FIXED[i].alpha : c[3];
+         }
+      }
+      if (probeColors && spread < GRAY_SPREAD) {
+         @synchronized (probeNames) {
+            NSUInteger index = [probeNames indexOfObject:name];
+
+            if (index == NSNotFound) {
+               [probeNames addObject:[NSString stringWithFormat:@"%@", name]];
+               index = probeNames.count - 1;
+               [probeNames replaceObjectAtIndex:index withObject:[NSString stringWithFormat:@"%@\t%.0f\t%.2f", name, level * 255, c[3]]];
+            }
+            CGFloat values[4] = { (CGFloat)((index + 1) % 256) / 255, (CGFloat)(100 + (index + 1) / 256) / 255, 1.0 / 255, 1 };
+
+            mapped = CGColorCreate(srgbSpace, values);
+         }
+      } else if (fixed >= 0) {
+         CGFloat values[4] = { fixed, fixed, fixed, fixedAlpha };
+
+         mapped = CGColorCreate(srgbSpace, values);
+      } else if (spread < GRAY_SPREAD) {
+         CGFloat white = liftGray(level, c[3]);
+         CGFloat values[4] = { white, white, white, c[3] };
+
+         mapped = CGColorCreate(srgbSpace, values);
+      }
+   }
+   if (rgb) {
+      CGColorRelease(rgb);
+   }
+   return mapped;
+}
+
 /**
  * Records the __TEXT range of images inside the Logic Pro bundle.
  *
@@ -214,6 +310,10 @@ static CGFloat mapGrayWith(CGFloat white, CGFloat alpha, double lightest, double
 }
 
 static CGFloat mapGray(CGFloat white, CGFloat alpha) {
+   if (classicLook) {
+      // LP_PROBE marks literal grays with blue 2/255 and green 200/255, keeping the level in red.
+      return probeColors ? white : liftGray(white, alpha);
+   }
    return mapGrayWith(white, alpha, surfaceMax, grayGamma);
 }
 
@@ -347,6 +447,10 @@ static CGColorRef copyMappedColorWith(CGColorRef color, NSString *name, double s
 static CGColorRef copyMappedColor(CGColorRef color, NSString *name) {
    AreaSetting area = areaSettings[areaOfColor(name)];
 
+   // Plug-in colors always keep the stock look, in every look.
+   if (classicLook) {
+      return areaOfColor(name) == AREA_PLUGINS ? NULL : copyClassicColor(color, name);
+   }
    if (area.mode == AREA_MODE_ORIGINAL) {
       return NULL;
    }
@@ -509,6 +613,11 @@ static BOOL isPluginDrawing(void) {
    if (pluginDrawDepth > 0) {
       return YES;
    }
+   // In the Logic 12 look every window is dark, so the drawing appearance cannot tell a plug-in;
+   // the window-based draw guard (pluginDrawDepth) and the caller checks decide alone.
+   if (classicLook) {
+      return NO;
+   }
    if (!(atomic_load_explicit(&hasPluginWindow, memory_order_acquire) || atomic_load_explicit(&hasDarkControlBar, memory_order_acquire)) || isCheckingPlugin) {
       return NO;
    }
@@ -590,9 +699,13 @@ static void hookAppSetAppearance(id app, SEL sel, NSAppearance *appearance) {
 #define RGB_HOOK(fn, orig) \
    static NSColor *fn(id cls, SEL sel, CGFloat r, CGFloat g, CGFloat b, CGFloat a) { \
       if (shouldSkip() || isPluginCaller(__builtin_return_address(0)) || isSharedForPlugin(__builtin_return_address(0))) { \
+      } else if (probeColors && isLogicCaller(__builtin_return_address(0)) && isGrayish(r, g, b)) { \
+         r = (r + g + b) / 3; \
+         g = 200.0 / 255; \
+         b = 2.0 / 255; \
       } else if (isLogicCaller(__builtin_return_address(0)) && isGrayish(r, g, b)) { \
          r = g = b = mapGray((r + g + b) / 3, a); \
-      } else if (isLogicCaller(__builtin_return_address(0)) && isDarkenedLiteral(r, g, b)) { \
+      } else if (!classicLook && isLogicCaller(__builtin_return_address(0)) && isDarkenedLiteral(r, g, b)) { \
          r *= ACCENT_DARKEN; \
          g *= ACCENT_DARKEN; \
          b *= ACCENT_DARKEN; \
@@ -1039,7 +1152,7 @@ static NSImageRep *hookBestRep(NSImage *image, SEL sel, NSRect rect, NSGraphicsC
 }
 
 static void interposeThreePart(NSRect frame, NSImage *start, NSImage *center, NSImage *end, BOOL vertical, NSCompositingOperation op, CGFloat fraction, BOOL flipped) {
-   if (isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !shouldSkip()) {
+   if (!classicLook && isLogicCaller(__builtin_return_address(0)) && !isPluginCaller(__builtin_return_address(0)) && !shouldSkip()) {
       start = drawableImage(start);
       center = drawableImage(center);
       end = drawableImage(end);
@@ -1061,7 +1174,7 @@ static void interposeDrawPath(CGContextRef ctx, CGPathDrawingMode mode) {
    CGColorRef fill = NULL;
    size_t count = 0;
 
-   if (isLogicCaller(__builtin_return_address(0)) && !shouldSkip()) {
+   if (!classicLook && isLogicCaller(__builtin_return_address(0)) && !shouldSkip()) {
       caller = (uintptr_t)__builtin_return_address(2) & ADDRESS_MASK;
    }
    if (caller >= regionDrawStart && caller < regionDrawEnd && fillColorOf) {
@@ -1091,7 +1204,7 @@ static void interposeDrawPath(CGContextRef ctx, CGPathDrawingMode mode) {
  * @param color CGColorRef - the fill color
  */
 static void interposeFillColor(CGContextRef ctx, CGColorRef color) {
-   const CGFloat *c = isOnBevel && color && !shouldSkip() ? CGColorGetComponents(color) : NULL;
+   const CGFloat *c = !classicLook && isOnBevel && color && !shouldSkip() ? CGColorGetComponents(color) : NULL;
    size_t count = c ? CGColorGetNumberOfComponents(color) : 0;
 
    if (count >= 2 && fmax(c[0], c[count > 2 ? count - 2 : 0]) < BLACK_MAX) {
@@ -1119,7 +1232,7 @@ static void interposeLineDraw(CTLineRef line, CGContextRef ctx) {
    CGColorRef text = NULL, rgb = NULL;
    const CGFloat *c = NULL;
 
-   if (caller >= textDraw.start && caller < textDraw.end && !shouldSkip() && isCalledFrom(rulerMarkerDraw, (ImageRange){ 0, 0 })) {
+   if (!classicLook && caller >= textDraw.start && caller < textDraw.end && !shouldSkip() && isCalledFrom(rulerMarkerDraw, (ImageRange){ 0, 0 })) {
       runs = CTLineGetGlyphRuns(line);
    }
    if (runs && CFArrayGetCount(runs) > 0) {
@@ -1683,6 +1796,78 @@ static void darkenControlBar(NSWindow *window) {
    }
 }
 
+static NSColor *classicTitleGray;
+
+// Logic 12 had no glass capsules behind the toolbar groups. Each capsule becomes clear glass tinted
+// with the title bar gray, through the public NSGlassEffectView properties, so it blends into the
+// flat title bar and the buttons stay as they are.
+static void hideToolbarGlass(NSView *view, int depth) {
+   Class glass = objc_getClass("NSGlassEffectView");
+
+   if (!glass || depth > 12) {
+      return;
+   }
+   for (NSView *child in view.subviews) {
+      if ([child isKindOfClass:glass]) {
+         NSGlassEffectView *effect = (NSGlassEffectView *)child;
+
+         if (effect.style != NSGlassEffectViewStyleClear) {
+            effect.style = NSGlassEffectViewStyleClear;
+         }
+         if (![effect.tintColor isEqual:classicTitleGray]) {
+            effect.tintColor = classicTitleGray;
+         }
+      }
+      hideToolbarGlass(child, depth + 1);
+   }
+}
+
+// In the Logic 12 look the title bar and toolbar of Logic's own windows are light gray glass with
+// dark glyphs, as in Logic Pro 12. Only a window that Logic Pro's own code shows qualifies, so a
+// plug-in window is never changed. Main thread only, and safe to repeat.
+static void lightenTitleBar(NSWindow *window) {
+   Class container = objc_getClass("NSTitlebarContainerView");
+   Class toolbar = objc_getClass("NSToolbarView");
+
+   if (!trueAqua || !container || !isLogicOwnedWindow(window) || !(window.styleMask & NSWindowStyleMaskTitled)) {
+      return;
+   }
+   // A flat gray title bar, as in Logic 12: the title bar shows the window background.
+   if (!window.titlebarAppearsTransparent) {
+      window.titlebarAppearsTransparent = YES;
+   }
+   if (window.backgroundColor != classicTitleGray) {
+      window.backgroundColor = classicTitleGray;
+   }
+   for (NSView *view in window.contentView.superview.subviews) {
+      if ([view isKindOfClass:container]) {
+         if (view.appearance != trueAqua) {
+            view.appearance = trueAqua;
+         }
+         hideToolbarGlass(view, 0);
+      }
+   }
+   // The toolbar view takes its appearance from the window, not from the title bar above it.
+   NSMutableArray<NSView *> *queue = [NSMutableArray arrayWithObject:window.contentView.superview ?: window.contentView];
+
+   for (int depth = 0; depth < 6 && queue.count > 0 && toolbar; depth++) {
+      NSMutableArray<NSView *> *next = [NSMutableArray array];
+
+      for (NSView *v in queue) {
+         for (NSView *child in v.subviews) {
+            if ([child isKindOfClass:toolbar]) {
+               if (child.appearance != trueAqua) {
+                  child.appearance = trueAqua;
+               }
+            } else {
+               [next addObject:child];
+            }
+         }
+      }
+      queue = next;
+   }
+}
+
 static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode place, NSInteger other) {
    if (isRealtimeThread()) {
       ((void (*)(id, SEL, NSWindowOrderingMode, NSInteger))origOrderWindow)(window, sel, place, other);
@@ -1695,7 +1880,7 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
          window.appearance = trueDarkAqua;
       }
       restorePluginAppearance(window.contentView.superview ?: window.contentView);
-   } else if (surfaceMax < 1 && !isControlBarOriginal() && place != NSWindowOut && isLogicWindow(window) && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
+   } else if (!classicLook && surfaceMax < 1 && !isControlBarOriginal() && place != NSWindowOut && isLogicWindow(window) && (window.styleMask & NSWindowStyleMaskTitled) && !window.titlebarAppearsTransparent) {
       // With the control bar set to Original, BackgroundViewControlbar stays stock dark, so a window
       // such as Settings got a dark background under black text. Such a window keeps its own light
       // background and title bar, as at 100 percent (BL-28, higherground, 2026-11-15).
@@ -1706,8 +1891,11 @@ static void hookOrderWindow(NSWindow *window, SEL sel, NSWindowOrderingMode plac
    }
    ((void (*)(id, SEL, NSWindowOrderingMode, NSInteger))origOrderWindow)(window, sel, place, other);
    // After ordering, so a title bar that macOS builds while showing the window is covered too.
-   if (place != NSWindowOut && isControlBarOriginal()) {
+   if (place != NSWindowOut && !classicLook && isControlBarOriginal()) {
       darkenControlBar(window);
+   }
+   if (place != NSWindowOut && classicLook) {
+      lightenTitleBar(window);
    }
 }
 
@@ -1752,6 +1940,14 @@ static void hookPlatterLayout(NSView *platter, SEL sel) {
       glass.alphaValue = 1;
    }
    ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
+}
+
+// A toolbar group that macOS lays out again gets its glass back, so the Logic 12 look hides it again.
+static void hookClassicPlatterLayout(NSView *platter, SEL sel) {
+   ((void (*)(id, SEL))origPlatterLayout)(platter, sel);
+   if (!isRealtimeThread() && pthread_main_np() && isLogicOwnedWindow(platter.window)) {
+      lightenTitleBar(platter.window);
+   }
 }
 
 static IMP swapClassMethod(Class cls, SEL sel, IMP hook) {
@@ -1824,6 +2020,11 @@ static void renderTest(void) {
          }
       }
       [log writeToFile:[outDir stringByAppendingPathComponent:@"theme.log"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+      if (probeColors) {
+         @synchronized (probeNames) {
+            [[probeNames componentsJoinedByString:@"\n"] writeToFile:[outDir stringByAppendingPathComponent:@"probe.txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+         }
+      }
       _exit(0); // Quits with no save prompt, because the test project is a scratch copy.
    });
 }
@@ -2058,6 +2259,49 @@ static NSSet<NSString *> *listSingleAppearanceNames(void) {
    return [NSSet setWithArray:names];
 }
 
+/**
+ * Installs the hooks of the Logic 12 look: the catalog and literal color hooks, the window-based
+ * plug-in draw guard, and the window hook that keeps plug-in windows stock and lightens the title
+ * bar. Nothing else of the light theme runs.
+ */
+static void startClassic(void) {
+   Class color = [NSColor class];
+
+   classicTitleGray = [NSColor colorWithSRGBRed:166.0 / 255 green:166.0 / 255 blue:166.0 / 255 alpha:1];
+
+
+   if (getenv("LP_PROBE") && getenv("LP_OUT")) {
+      probeColors = YES;
+      probeNames = [NSMutableArray array];
+   }
+   origCGColor = method_setImplementation(class_getInstanceMethod(NSClassFromString(@"CUINamedColor"), @selector(cgColor)), (IMP)hookCGColor);
+   origCalWhite = swapClassMethod(color, @selector(colorWithCalibratedWhite:alpha:), (IMP)hookCalWhite);
+   origDevWhite = swapClassMethod(color, @selector(colorWithDeviceWhite:alpha:), (IMP)hookDevWhite);
+   origWhite = swapClassMethod(color, @selector(colorWithWhite:alpha:), (IMP)hookWhite);
+   origGenWhite = swapClassMethod(color, @selector(colorWithGenericGamma22White:alpha:), (IMP)hookGenWhite);
+   origCalRGB = swapClassMethod(color, @selector(colorWithCalibratedRed:green:blue:alpha:), (IMP)hookCalRGB);
+   origDevRGB = swapClassMethod(color, @selector(colorWithDeviceRed:green:blue:alpha:), (IMP)hookDevRGB);
+   origRGB = swapClassMethod(color, @selector(colorWithRed:green:blue:alpha:), (IMP)hookRGB);
+   origSRGB = swapClassMethod(color, @selector(colorWithSRGBRed:green:blue:alpha:), (IMP)hookSRGB);
+   if (class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawRect:clip:"))) {
+      origDrawRectClip = method_setImplementation(class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawRect:clip:")), (IMP)hookDrawRectClip);
+   }
+   if (class_getInstanceMethod([NSView class], @selector(drawLayer:inContext:))) {
+      origDrawLayer = method_setImplementation(class_getInstanceMethod([NSView class], @selector(drawLayer:inContext:)), (IMP)hookDrawLayer);
+   }
+   if (class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawViewBackingLayer:inContext:drawingHandler:"))) {
+      origDrawBackingLayer = method_setImplementation(class_getInstanceMethod([NSView class], NSSelectorFromString(@"_drawViewBackingLayer:inContext:drawingHandler:")), (IMP)hookDrawBackingLayer);
+   }
+   origOrderWindow = method_setImplementation(class_getInstanceMethod([NSWindow class], @selector(orderWindow:relativeTo:)), (IMP)hookOrderWindow);
+   if (objc_getClass("NSToolbarPlatterView")) {
+      origPlatterLayout = method_setImplementation(class_getInstanceMethod(objc_getClass("NSToolbarPlatterView"), @selector(layout)), (IMP)hookClassicPlatterLayout);
+   }
+   if (getenv("LP_OUT")) {
+      outDir = [NSString stringWithUTF8String:getenv("LP_OUT")];
+      renderTest();
+   }
+}
+
 __attribute__((constructor)) static void start(void) {
    Class color = [NSColor class];
    Class manager, tooltip;
@@ -2079,6 +2323,8 @@ __attribute__((constructor)) static void start(void) {
    grayGamma = readSetting("LP_GAMMA", @"gamma", grayGamma, GAMMA_MIN, GAMMA_MAX);
    surfaceMax = readSetting("LP_SURFACE_MAX", @"surfaceMax", surfaceMax, SURFACE_MAX_MIN, 1);
    readAreaSettings();
+   // The look: 0 is the light theme, 1 is the Logic 12 look. LP_LOOK=12 sets it for a test.
+   classicLook = getenv("LP_LOOK") ? atoi(getenv("LP_LOOK")) == 12 : [[[NSUserDefaults alloc] initWithSuiteName:SETTINGS_DOMAIN] integerForKey:@"look"] == LOOK_LOGIC12;
    srgbSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
    singleAppearanceNames = listSingleAppearanceNames();
    trueAqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
@@ -2095,6 +2341,10 @@ __attribute__((constructor)) static void start(void) {
    rulerMarkerDraw = functionRange("_Z12PrintMarkersR6U_VARSP5CSongP7FENSTERxx19TSignedAbsPureClockb", "_Z18ColoredMarkerAchseP5CSongP7FENSTERxxb");
    threePartDraw = functionRange("MADrawingThreePartImage", "MADrawingTwoPartVerticalImage");
    fillColorOf = dlsym(RTLD_DEFAULT, "CGContextGetFillColorAsColor");
+   if (classicLook) {
+      startClassic();
+      return;
+   }
 
    origAppearanceNamed = swapClassMethod([NSAppearance class], @selector(appearanceNamed:), (IMP)hookAppearanceNamed);
    origAppSetAppearance = method_setImplementation(class_getInstanceMethod([NSApplication class], @selector(setAppearance:)), (IMP)hookAppSetAppearance);
